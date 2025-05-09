@@ -1,4 +1,4 @@
-const PROXY_URL = 'https://reawake-server.vercel.app/';
+const PROXY_URL = 'https://reawake-server.vercel.app';
 
 // Hàm mã hóa đơn giản để bảo vệ email trong sessionStorage
 function simpleEncrypt(text) {
