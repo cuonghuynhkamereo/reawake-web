@@ -1,4 +1,4 @@
-const PROXY_URL = 'https://reawake-server.vercel.app';
+const PROXY_URL = 'https://reawake-server.vercel.app/';
 
 function showLoading() {
   document.getElementById('loading').style.display = 'flex';
