@@ -1,11 +1,4 @@
-try {
-  const PROXY_URL = 'http://localhost:3000';
-} catch (error) {
-  const PROXY_URL = 'https://reawake-server.vercel.app';
-}
-
-// const PROXY_URL = 'http://localhost:3000';
-const PROXY_URL = 'https://reawake-server.vercel.app';
+const PROXY_URL = 'http://localhost:3000';
 
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 giờ
 const CURRENT_DATE = new Date('2025-05-08');

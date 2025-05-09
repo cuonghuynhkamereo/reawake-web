@@ -1,11 +1,4 @@
-try {
-  const PROXY_URL = 'http://localhost:3000';
-} catch (error) {
-  const PROXY_URL = 'https://reawake-server.vercel.app';
-}
-
-// const PROXY_URL = 'http://localhost:3000';
-const PROXY_URL = 'https://reawake-server.vercel.app';
+const PROXY_URL = 'http://localhost:3000';
 
 function showLoading() {
   document.getElementById('loading').style.display = 'flex';
