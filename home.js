@@ -62,6 +62,14 @@ function parseDate(dateStr) {
   return new Date(0);
 }
 
+function formatDateToDDMMYYYY(date) {
+  if (!date || isNaN(date)) return '';
+  const d = String(date.getDate()).padStart(2, '0');
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const y = date.getFullYear();
+  return `${d}/${m}/${y}`;
+}
+
 function calculateDaysSinceLastOrder(lastOrderDate) {
   const lastOrder = parseDate(lastOrderDate);
   const diffTime = Math.abs(CURRENT_DATE - lastOrder);
@@ -90,7 +98,7 @@ function getDateRangeForChurn(churnMonth, activeHistory) {
       .sort((a, b) => a - b)[0];
     
     if (earliestActive) {
-      maxDate = new Date(earliestActive.getFullYear(), earliestActive.getMonth(), 0); // Last day of the previous month
+      maxDate = new Date(earliestActive.getFullYear(), earliestActive.getMonth() - 1, 0); // Last day of the month before earliest active
     } else {
       maxDate = new Date(CURRENT_DATE.getFullYear(), CURRENT_DATE.getMonth(), 0); // Last day of previous month from current date
     }
@@ -582,6 +590,7 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
             dateRange = getDateRangeForChurn(latestChurn.churnMonth, activeHistory);
             contactDateInput.setAttribute('min', formatDateToYYYYMMDD(dateRange.minDate));
             contactDateInput.setAttribute('max', formatDateToYYYYMMDD(dateRange.maxDate));
+            contactDateInput.value = ''; // Reset Contact Date
 
             actionSelect.innerHTML = '<option value="">Select action</option>';
             whyNotReawakenSelect.innerHTML = '<option value="">Select reason</option>';
@@ -618,6 +627,11 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
             dateRange = getDateRangeForActive(selectedActiveMonth);
             contactDateInput.setAttribute('min', formatDateToYYYYMMDD(dateRange.minDate));
             contactDateInput.setAttribute('max', formatDateToYYYYMMDD(dateRange.maxDate));
+            contactDateInput.value = ''; // Reset Contact Date
+          } else {
+            contactDateInput.removeAttribute('min');
+            contactDateInput.removeAttribute('max');
+            contactDateInput.value = ''; // Reset Contact Date
           }
 
           actionSelect.innerHTML = '<option value="">Select action</option>';
@@ -637,9 +651,11 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
             dateRange = getDateRangeForActive(selectedActiveMonth);
             contactDateInput.setAttribute('min', formatDateToYYYYMMDD(dateRange.minDate));
             contactDateInput.setAttribute('max', formatDateToYYYYMMDD(dateRange.maxDate));
+            contactDateInput.value = ''; // Reset Contact Date
           } else {
             contactDateInput.removeAttribute('min');
             contactDateInput.removeAttribute('max');
+            contactDateInput.value = ''; // Reset Contact Date
           }
         });
       });
@@ -650,6 +666,7 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
     const resetModal = () => {
       modal.classList.remove('active');
       document.getElementById('modal-note').value = '';
+      document.getElementById('modal-contact-date').value = ''; // Reset Contact Date
       const selectElements = modal.querySelectorAll('select');
       selectElements.forEach(select => {
         select.blur();
@@ -715,12 +732,28 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
         return;
       }
 
+      // Check for duplicate action
+      const progressItems = progressByStore[storeId] || [];
+      const isDuplicate = progressItems.some(item => {
+        return item.actions.some(actionItem => 
+          actionItem.contactDate === formatDateToDDMMYYYY(selectedContactDate) &&
+          actionItem.typeOfContact === typeOfContact &&
+          actionItem.action === action &&
+          (isChurnActive ? item.churnMonth === churnMonthLastOrderDate : item.activeMonth === activeMonth)
+        );
+      });
+      if (isDuplicate) {
+        showNotification('This action already exists for the selected date and type!', 'error');
+        resetModal();
+        return;
+      }
+
       const payload = {
         email: userEmail,
         storeId,
         storeName,
         action,
-        contactDate,
+        contactDate: formatDateToDDMMYYYY(selectedContactDate), // Send in DD/MM/YYYY format
         PIC: pic,
         subteam,
         typeOfContact,
@@ -778,7 +811,7 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
         }
       } finally {
         hideLoading();
-        submitBtn.disabled = false;
+        submitBtn.disabled = false; // Keep disabled until fully processed
         resetModal();
       }
     }, 300);
