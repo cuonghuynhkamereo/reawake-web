@@ -170,6 +170,11 @@ async function fetchAndDisplayData(userEmail, cacheKey) {
       data,
       timestamp: now
     }));
+
+    // Clear the table before displaying new data
+    const tbody = document.getElementById('stores-body');
+    tbody.innerHTML = '';
+
     displayData(data, userEmail);
   } catch (error) {
     console.error('Error fetching data:', error);
@@ -248,6 +253,7 @@ async function displayData(data, userEmail) {
   }
 
   const picFilter = document.getElementById('pic-filter');
+  picFilter.innerHTML = '<option value="All">All</option>'; // Reset PIC filter
   const uniquePICs = [...new Set(stores.map(store => store.finalCurrentPIC).filter(pic => pic && pic !== 'N/A'))];
   uniquePICs.sort();
   uniquePICs.forEach(pic => {
@@ -322,7 +328,7 @@ function applyFilters(stores, progressByStore, userEmail, picInfo, dropdownChurn
 
 function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnActions, dropdownActiveActions, dropdownWhyReasons) {
   const tbody = document.getElementById('stores-body');
-  tbody.innerHTML = '';
+  tbody.innerHTML = ''; // Clear the table before updating
 
   const sortedStores = [...stores].sort((a, b) => {
     const noDaysNoBuyA = calculateDaysSinceLastOrder(a.lastOrderDate);
@@ -562,6 +568,15 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
 
         document.getElementById('modal-note').value = '';
         document.getElementById('modal-why-not-reawaken').value = '';
+
+        // Force date format to yyyy/mm/dd when a date is selected
+        contactDateInput.addEventListener('change', () => {
+          const value = contactDateInput.value;
+          if (value) {
+            const date = new Date(value);
+            contactDateInput.value = formatDateToYYYYMMDD(date);
+          }
+        });
 
         churnToggle.addEventListener('click', () => {
           if (!churnToggle.disabled) {
