@@ -86,26 +86,10 @@ function formatDateToYYYYMMDD(date) {
   return date.toISOString().split('T')[0]; // Returns YYYY-MM-DD
 }
 
-function getDateRangeForChurn(churnMonth, activeHistory) {
+function getDateRangeForChurn(churnMonth) {
   const churnDate = parseDate(churnMonth);
-  let minDate = new Date(churnDate.getFullYear(), churnDate.getMonth(), 1);
-  
-  let maxDate;
-  if (activeHistory && activeHistory.length > 0) {
-    const earliestActive = activeHistory
-      .map(history => parseDate(history.activeMonth))
-      .filter(date => !isNaN(date) && date > churnDate)
-      .sort((a, b) => a - b)[0];
-    
-    if (earliestActive) {
-      maxDate = new Date(earliestActive.getFullYear(), earliestActive.getMonth() - 1, 0); // Last day of the month before earliest active
-    } else {
-      maxDate = new Date(CURRENT_DATE.getFullYear(), CURRENT_DATE.getMonth(), 0); // Last day of previous month from current date
-    }
-  } else {
-    maxDate = new Date(CURRENT_DATE.getFullYear(), CURRENT_DATE.getMonth(), 0);
-  }
-
+  const minDate = new Date(churnDate.getFullYear(), churnDate.getMonth(), 1);
+  const maxDate = new Date(CURRENT_DATE); // Up to current date
   return { minDate, maxDate };
 }
 
@@ -533,7 +517,7 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
           churnToggle.disabled = false;
           document.getElementById('modal-churn-month').value = latestChurn.churnMonth || store.lastOrderDate || 'N/A';
 
-          dateRange = getDateRangeForChurn(latestChurn.churnMonth, activeHistory);
+          dateRange = getDateRangeForChurn(latestChurn.churnMonth);
           contactDateInput.setAttribute('min', formatDateToYYYYMMDD(dateRange.minDate));
           contactDateInput.setAttribute('max', formatDateToYYYYMMDD(dateRange.maxDate));
 
@@ -587,7 +571,7 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
             activeFields.forEach(field => field.style.display = 'none');
             whyNotReawakenSelect.style.display = 'block';
 
-            dateRange = getDateRangeForChurn(latestChurn.churnMonth, activeHistory);
+            dateRange = getDateRangeForChurn(latestChurn.churnMonth);
             contactDateInput.setAttribute('min', formatDateToYYYYMMDD(dateRange.minDate));
             contactDateInput.setAttribute('max', formatDateToYYYYMMDD(dateRange.maxDate));
             contactDateInput.value = ''; // Reset Contact Date
@@ -704,21 +688,8 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
       }
 
       let dateRange;
-      let activeHistory = [];
-      try {
-        const activeHistoryResponse = await fetch(`${PROXY_URL}/active-history`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ storeId })
-        });
-        if (!activeHistoryResponse.ok) throw new Error(`HTTP error! Status: ${activeHistoryResponse.status}`);
-        activeHistory = await activeHistoryResponse.json();
-      } catch (error) {
-        console.error('Error fetching Active History for validation:', error);
-      }
-
       if (isChurnActive) {
-        dateRange = getDateRangeForChurn(churnMonthLastOrderDate, activeHistory);
+        dateRange = getDateRangeForChurn(churnMonthLastOrderDate);
       } else {
         dateRange = getDateRangeForActive(activeMonth);
       }
@@ -778,27 +749,16 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
         const result = await response.json();
         if (result.success) {
           showNotification('Action recorded successfully!', 'success');
-          const progressResponse = await fetch(`${PROXY_URL}/progress`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: userEmail })
-          });
-          if (progressResponse.ok) {
-            const updatedProgress = await progressResponse.json();
-            updateTable(stores, updatedProgress, userEmail, picInfo, dropdownChurnActions, dropdownActiveActions, dropdownWhyReasons);
-            const storeRow = Array.from(tbody.children).find(row => 
-              row.querySelector('td:first-child').textContent === storeId
-            );
-            if (storeRow) {
-              const journeyBtn = storeRow.querySelector('.journey-button');
-              const progressRow = storeRow.nextElementSibling;
-              if (progressRow && journeyBtn) {
-                progressRow.classList.add('open');
-                journeyBtn.classList.add('active');
-                storeRow.classList.add('open-row');
-              }
-            }
-          }
+          
+          // Clear search inputs
+          document.getElementById('search-store-id').value = '';
+          document.getElementById('search-store-name').value = '';
+          document.getElementById('search-buyer-id').value = '';
+
+          // Reset data by clearing localStorage and fetching fresh data
+          const cacheKey = `homeData_${userEmail}`;
+          localStorage.removeItem(cacheKey);
+          await fetchAndDisplayData(userEmail, cacheKey);
         } else {
           showNotification('Error recording data: ' + (result.error || 'Unknown reason'), 'error');
         }
@@ -811,7 +771,7 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
         }
       } finally {
         hideLoading();
-        submitBtn.disabled = false; // Keep disabled until fully processed
+        submitBtn.disabled = false;
         resetModal();
       }
     }, 300);
