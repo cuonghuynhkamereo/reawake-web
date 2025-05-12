@@ -105,8 +105,8 @@ function isDateInRange(date, minDate, maxDate) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const userEmail = sessionStorage.userEmail;
-  // const userEmail = 'hieu.ngoc@kamereo.vn';
+  // const userEmail = sessionStorage.userEmail;
+  const userEmail = 'duong.doan@kamereo.vn';
   if (!userEmail) {
     window.location.href = 'index.html';
     return;
