@@ -135,8 +135,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     showLoading();
     try {
       localStorage.removeItem(cacheKey);
-      await fetchAndDisplayData(userEmail, cacheKey);
       showNotification('Data refreshed successfully!', 'success');
+      // Refresh the entire page after clearing localStorage
+      window.location.reload();
     } catch (error) {
       console.error('Error resetting data:', error);
       showNotification('Error refreshing data. Please try again.', 'error');
@@ -770,10 +771,8 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
           document.getElementById('search-store-name').value = '';
           document.getElementById('search-buyer-id').value = '';
 
-          // Reset data by clearing localStorage and fetching fresh data
-          const cacheKey = `homeData_${userEmail}`;
-          localStorage.removeItem(cacheKey);
-          await fetchAndDisplayData(userEmail, cacheKey);
+          // Refresh the entire page after successful submission
+          window.location.reload();
         } else {
           showNotification('Error recording data: ' + (result.error || 'Unknown reason'), 'error');
         }
