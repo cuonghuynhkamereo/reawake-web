@@ -1,6 +1,6 @@
-const PROXY_URL = 'https://reawake-server.onrender.com'; // Cập nhật domain backend sau khi deploy
-const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-const CURRENT_DATE = new Date('2025-05-12');
+const PROXY_URL = 'https://reawake-server.onrender.com';
+const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+const CURRENT_DATE = new Date();
 
 function showLoading() {
   document.getElementById('loading').style.display = 'flex';
@@ -48,7 +48,8 @@ function parseDate(dateStr) {
   if (!dateStr) return new Date(0);
   const formats = [
     { pattern: /^(\d{2})\/(\d{2})\/(\d{4})$/, parse: ([_, d, m, y]) => new Date(`${y}-${m}-${d}`) },
-    { pattern: /^(\d{4})-(\d{2})-(\d{2})$/, parse: ([_, y, m, d]) => new Date(`${y}-${m}-${d}`) }
+    { pattern: /^(\d{4})-(\d{2})-(\d{2})$/, parse: ([_, y, m, d]) => new Date(`${y}-${m}-${d}`) },
+    { pattern: /^(\d{2})\/(\d{4})$/, parse: ([_, m, y]) => new Date(`${y}-${m}-01`) } // For MM/YYYY format
   ];
   for (const { pattern, parse } of formats) {
     const match = dateStr.match(pattern);
@@ -70,6 +71,45 @@ function calculateDaysSinceLastOrder(lastOrderDate) {
 function formatMonthYear(date) {
   if (!date || isNaN(date)) return '';
   return date.toLocaleString('en-US', { month: '2-digit', year: 'numeric' }).replace(/(\d+)\/(\d+)/, '$1/$2');
+}
+
+function formatDateToYYYYMMDD(date) {
+  if (!date || isNaN(date)) return '';
+  return date.toISOString().split('T')[0]; // Returns YYYY-MM-DD
+}
+
+function getDateRangeForChurn(churnMonth, activeHistory) {
+  const churnDate = parseDate(churnMonth);
+  let minDate = new Date(churnDate.getFullYear(), churnDate.getMonth(), 1);
+  
+  let maxDate;
+  if (activeHistory && activeHistory.length > 0) {
+    const earliestActive = activeHistory
+      .map(history => parseDate(history.activeMonth))
+      .filter(date => !isNaN(date) && date > churnDate)
+      .sort((a, b) => a - b)[0];
+    
+    if (earliestActive) {
+      maxDate = new Date(earliestActive.getFullYear(), earliestActive.getMonth(), 0); // Last day of the previous month
+    } else {
+      maxDate = new Date(CURRENT_DATE.getFullYear(), CURRENT_DATE.getMonth(), 0); // Last day of previous month from current date
+    }
+  } else {
+    maxDate = new Date(CURRENT_DATE.getFullYear(), CURRENT_DATE.getMonth(), 0);
+  }
+
+  return { minDate, maxDate };
+}
+
+function getDateRangeForActive(activeMonth) {
+  const activeDate = parseDate(activeMonth);
+  const minDate = new Date(activeDate.getFullYear(), activeDate.getMonth(), 1);
+  const maxDate = new Date(activeDate.getFullYear(), activeDate.getMonth() + 1, 0); // Last day of the active month
+  return { minDate, maxDate };
+}
+
+function isDateInRange(date, minDate, maxDate) {
+  return date >= minDate && date <= maxDate;
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -472,8 +512,11 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
         const activeToggle = document.getElementById('active-toggle');
         const churnFields = document.querySelectorAll('.churn-field');
         const activeFields = document.querySelectorAll('.active-field');
+        const contactDateInput = document.getElementById('modal-contact-date');
 
         const hasChurn = !!latestChurn;
+        let dateRange = { minDate: null, maxDate: null };
+
         if (hasChurn) {
           churnToggle.classList.add('active');
           activeToggle.classList.remove('active');
@@ -481,6 +524,10 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
           activeFields.forEach(field => field.style.display = 'none');
           churnToggle.disabled = false;
           document.getElementById('modal-churn-month').value = latestChurn.churnMonth || store.lastOrderDate || 'N/A';
+
+          dateRange = getDateRangeForChurn(latestChurn.churnMonth, activeHistory);
+          contactDateInput.setAttribute('min', formatDateToYYYYMMDD(dateRange.minDate));
+          contactDateInput.setAttribute('max', formatDateToYYYYMMDD(dateRange.maxDate));
 
           const churnType = latestChurn.typeOfChurn || '';
           const availableChurnActions = dropdownChurnActions[churnType] || [];
@@ -505,6 +552,13 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
           activeFields.forEach(field => field.style.display = 'block');
           churnToggle.disabled = true;
 
+          const selectedActiveMonth = activeMonthSelect.value || 'N/A';
+          if (selectedActiveMonth !== 'N/A') {
+            dateRange = getDateRangeForActive(selectedActiveMonth);
+            contactDateInput.setAttribute('min', formatDateToYYYYMMDD(dateRange.minDate));
+            contactDateInput.setAttribute('max', formatDateToYYYYMMDD(dateRange.maxDate));
+          }
+
           dropdownActiveActions.forEach(action => {
             const option = document.createElement('option');
             option.value = action;
@@ -524,6 +578,10 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
             churnFields.forEach(field => field.style.display = 'block');
             activeFields.forEach(field => field.style.display = 'none');
             whyNotReawakenSelect.style.display = 'block';
+
+            dateRange = getDateRangeForChurn(latestChurn.churnMonth, activeHistory);
+            contactDateInput.setAttribute('min', formatDateToYYYYMMDD(dateRange.minDate));
+            contactDateInput.setAttribute('max', formatDateToYYYYMMDD(dateRange.maxDate));
 
             actionSelect.innerHTML = '<option value="">Select action</option>';
             whyNotReawakenSelect.innerHTML = '<option value="">Select reason</option>';
@@ -555,6 +613,13 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
           churnFields.forEach(field => field.style.display = 'none');
           whyNotReawakenSelect.style.display = 'none';
 
+          const selectedActiveMonth = activeMonthSelect.value || 'N/A';
+          if (selectedActiveMonth !== 'N/A') {
+            dateRange = getDateRangeForActive(selectedActiveMonth);
+            contactDateInput.setAttribute('min', formatDateToYYYYMMDD(dateRange.minDate));
+            contactDateInput.setAttribute('max', formatDateToYYYYMMDD(dateRange.maxDate));
+          }
+
           actionSelect.innerHTML = '<option value="">Select action</option>';
           dropdownActiveActions.forEach(action => {
             const option = document.createElement('option');
@@ -563,6 +628,20 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
             actionSelect.appendChild(option);
           });
         });
+
+        activeMonthSelect.addEventListener('change', () => {
+          if (!activeToggle.classList.contains('active')) return;
+
+          const selectedActiveMonth = activeMonthSelect.value || 'N/A';
+          if (selectedActiveMonth !== 'N/A') {
+            dateRange = getDateRangeForActive(selectedActiveMonth);
+            contactDateInput.setAttribute('min', formatDateToYYYYMMDD(dateRange.minDate));
+            contactDateInput.setAttribute('max', formatDateToYYYYMMDD(dateRange.maxDate));
+          } else {
+            contactDateInput.removeAttribute('min');
+            contactDateInput.removeAttribute('max');
+          }
+        });
       });
     });
 
@@ -570,7 +649,7 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
     const closeBtn = modal.querySelector('.close');
     const resetModal = () => {
       modal.classList.remove('active');
-      document.getElementById('modal-note').value = ''; // Reset Note field
+      document.getElementById('modal-note').value = '';
       const selectElements = modal.querySelectorAll('select');
       selectElements.forEach(select => {
         select.blur();
@@ -603,6 +682,35 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
 
       if (!contactDate || !typeOfContact || !action || (!isChurnActive && !activeMonth)) {
         showNotification('Please fill in all required fields: Contact Date, Type of Contact, Action, and Active Month (if applicable)!', 'error');
+        resetModal();
+        return;
+      }
+
+      let dateRange;
+      let activeHistory = [];
+      try {
+        const activeHistoryResponse = await fetch(`${PROXY_URL}/active-history`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ storeId })
+        });
+        if (!activeHistoryResponse.ok) throw new Error(`HTTP error! Status: ${activeHistoryResponse.status}`);
+        activeHistory = await activeHistoryResponse.json();
+      } catch (error) {
+        console.error('Error fetching Active History for validation:', error);
+      }
+
+      if (isChurnActive) {
+        dateRange = getDateRangeForChurn(churnMonthLastOrderDate, activeHistory);
+      } else {
+        dateRange = getDateRangeForActive(activeMonth);
+      }
+
+      const selectedContactDate = new Date(contactDate);
+      if (!isDateInRange(selectedContactDate, dateRange.minDate, dateRange.maxDate)) {
+        const minFormatted = formatDateToYYYYMMDD(dateRange.minDate);
+        const maxFormatted = formatDateToYYYYMMDD(dateRange.maxDate);
+        showNotification(`Contact Date must be between ${minFormatted} and ${maxFormatted}!`, 'error');
         resetModal();
         return;
       }
