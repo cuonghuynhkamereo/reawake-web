@@ -104,12 +104,23 @@ function isDateInRange(date, minDate, maxDate) {
   return date >= minDate && date <= maxDate;
 }
 
+function updateLastUpdated() {
+  const lastUpdated = document.getElementById('last-updated');
+  if (lastUpdated) {
+    const currentDate = formatDateToDDMMYYYY(CURRENT_DATE);
+    lastUpdated.textContent = `Last updated customer list data: 11:00 am - ${currentDate}`;
+  }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const userEmail = 'hieu.ngoc@kamereo.vn';
   if (!userEmail) {
     window.location.href = 'index.html';
     return;
   }
+
+  // Cập nhật thông tin Last Updated khi trang load
+  updateLastUpdated();
 
   const cacheKey = `homeData_${userEmail}`;
   let cachedData;
@@ -136,6 +147,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       localStorage.removeItem(cacheKey);
       showNotification('Data refreshed successfully!', 'success');
+      // Cập nhật lại thông tin Last Updated trước khi reload
+      updateLastUpdated();
       // Refresh the entire page after clearing localStorage
       window.location.reload();
     } catch (error) {
@@ -254,7 +267,7 @@ async function displayData(data, userEmail) {
   }
 
   const picFilter = document.getElementById('pic-filter');
-  picFilter.innerHTML = '<option value="All">All</option>'; // Reset PIC filter
+  picFilter.innerHTML = '<option value="All">All PICs</option>'; // Reset PIC filter
   const uniquePICs = [...new Set(stores.map(store => store.finalCurrentPIC).filter(pic => pic && pic !== 'N/A'))];
   uniquePICs.sort();
   uniquePICs.forEach(pic => {
