@@ -1,6 +1,6 @@
-const PROXY_URL = 'http://localhost:3000';
+const PROXY_URL = 'https://reawake-server.onrender.com'; // Cập nhật domain backend sau khi deploy
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-const CURRENT_DATE = new Date('2025-05-08');
+const CURRENT_DATE = new Date('2025-05-12');
 
 function showLoading() {
   document.getElementById('loading').style.display = 'flex';
