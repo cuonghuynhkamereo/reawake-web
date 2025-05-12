@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Home Page</title>
+  <link rel="stylesheet" href="home.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="header-card">
+    <div class="pic-info">
+      <p><strong>Full Name:</strong> <span id="pic-name">N/A</span></p>
+      <p><strong>Email:</strong> <span id="pic-email">N/A</span></p>
+      <p><strong>Team:</strong> <span id="pic-team">N/A</span></p>
+      <p><strong>Subteam:</strong> <span id="pic-subteam">N/A</span></p>
+    </div>
+    <div class="header-animation">
+      <img src="image/kamereo_run.png" alt="Kamereo Running" class="running-image">
+    </div>
+    <div class="header-actions">
+      <button id="reset-button" class="reset-button">Reset</button>
+      <img src="image/logo.png" alt="Kamereo Churn Management Logo" class="logo">
+    </div>
+  </div>
+
+  <div class="container">
+    <h2>Customer List</h2>
+    <table>
+      <thead>
+        <tr class="search-row">
+          <th><input type="text" id="search-store-id" placeholder="Search Store"></th>
+          <th><input type="text" id="search-store-name" placeholder="Search Store Name"></th>
+          <th><input type="text" id="search-buyer-id" placeholder="Search Buyer"></th>
+          <th></th>
+          <th></th>
+          <th>
+            <select id="pic-filter">
+              <option value="All">All PICs</option>
+            </select>
+          </th>
+          <th>
+            <select id="status-filter">
+              <option value="All">All</option>
+              <option value="Active">Active</option>
+              <option value="Churn">Churn</option>
+            </select>
+          </th>
+          <th></th>
+        </tr>
+        <tr>
+          <th>Store ID</th>
+          <th>Store Name</th>
+          <th>Buyer ID</th>
+          <th>Full Address</th>
+          <th>Last Order</th>
+          <th>PIC</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="stores-body"></tbody>
+    </table>
+  </div>
+
+  <div class="loading-overlay" id="loading">
+    <div class="spinner"></div>
+  </div>
+
+  <div class="modal" id="action-modal">
+    <div class="modal-content">
+      <span class="close">×</span>
+      <h3>Add Management Action</h3>
+      <div class="modal-toggle">
+        <button id="churn-toggle" class="toggle-button active">Churn</button>
+        <button id="active-toggle" class="toggle-button">Active</button>
+      </div>
+      <div class="form-group">
+        <label for="modal-store-id">Store ID:</label>
+        <input type="text" id="modal-store-id" readonly>
+      </div>
+      <div class="form-group">
+        <label for="modal-store-name">Store Name:</label>
+        <input type="text" id="modal-store-name" readonly>
+      </div>
+      <div class="form-group">
+        <label for="modal-contact-date">Contact Date:</label>
+        <input type="date" id="modal-contact-date" required>
+      </div>
+      <div class="form-group">
+        <label for="modal-pic">PIC:</label>
+        <input type="text" id="modal-pic" readonly>
+      </div>
+      <div class="form-group">
+        <label for="modal-subteam">Subteam:</label>
+        <input type="text" id="modal-subteam" readonly>
+      </div>
+      <div class="form-group">
+        <label for="modal-type-of-contact">Type of Contact:</label>
+        <select id="modal-type-of-contact" required>
+          <option value="">Select contact type</option>
+          <option value="Phone">Phone</option>
+          <option value="Email">Email</option>
+          <option value="In-person">In-person</option>
+          <option value="Message">Message</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="modal-action">Action:</label>
+        <select id="modal-action" required>
+          <option value="">Select action</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="modal-note">Note:</label>
+        <textarea id="modal-note" rows="3"></textarea>
+      </div>
+      <div class="form-group churn-field">
+        <label for="modal-why-not-reawaken">Why not re-awaken yet?</label>
+        <select id="modal-why-not-reawaken" required>
+          <option value="">Select reason</option>
+        </select>
+      </div>
+      <div class="form-group churn-field">
+        <label for="modal-churn-month">Churn Month (Last Order Date):</label>
+        <input type="text" id="modal-churn-month" readonly>
+      </div>
+      <div class="form-group active-field">
+        <label for="modal-active-month">Active Month:</label>
+        <select id="modal-active-month" required>
+          <option value="">Select Active Month</option>
+        </select>
+      </div>
+      <button id="submit-action" class="submit-button">Submit</button>
+    </div>
+  </div>
+
+  <div class="notification" id="notification">
+    <span id="notification-message"></span>
+  </div>
+
+  <script src="home.js"></script>
+</html>
