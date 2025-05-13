@@ -1,6 +1,13 @@
+let progressByStore = {};
+let dropdownChurnActions = {};
+let dropdownActiveActions = [];
+let dropdownWhyReasons = {};
+let picInfo = {};
+
 const PROXY_URL = 'https://reawake-server.onrender.com';
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 const CURRENT_DATE = new Date();
+const ITEMS_PER_PAGE = 20;
 
 function showLoading() {
   document.getElementById('loading').style.display = 'flex';
@@ -49,7 +56,7 @@ function parseDate(dateStr) {
   const formats = [
     { pattern: /^(\d{2})\/(\d{2})\/(\d{4})$/, parse: ([_, d, m, y]) => new Date(`${y}-${m}-${d}`) },
     { pattern: /^(\d{4})-(\d{2})-(\d{2})$/, parse: ([_, y, m, d]) => new Date(`${y}-${m}-${d}`) },
-    { pattern: /^(\d{2})\/(\d{4})$/, parse: ([_, m, y]) => new Date(`${y}-${m}-01`) } // For MM/YYYY format
+    { pattern: /^(\d{2})\/(\d{4})$/, parse: ([_, m, y]) => new Date(`${y}-${m}-01`) }
   ];
   for (const { pattern, parse } of formats) {
     const match = dateStr.match(pattern);
@@ -72,6 +79,9 @@ function formatDateToDDMMYYYY(date) {
 
 function calculateDaysSinceLastOrder(lastOrderDate) {
   const lastOrder = parseDate(lastOrderDate);
+  if (isNaN(lastOrder) || lastOrder.getTime() === 0) {
+    return Infinity; // Nếu không có ngày hợp lệ, coi như "rất lâu"
+  }
   const diffTime = Math.abs(CURRENT_DATE - lastOrder);
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
@@ -83,20 +93,20 @@ function formatMonthYear(date) {
 
 function formatDateToYYYYMMDD(date) {
   if (!date || isNaN(date)) return '';
-  return date.toISOString().split('T')[0]; // Returns YYYY-MM-DD
+  return date.toISOString().split('T')[0];
 }
 
 function getDateRangeForChurn(churnMonth) {
   const churnDate = parseDate(churnMonth);
   const minDate = new Date(churnDate.getFullYear(), churnDate.getMonth(), 1);
-  const maxDate = new Date(CURRENT_DATE); // Up to current date
+  const maxDate = new Date(CURRENT_DATE);
   return { minDate, maxDate };
 }
 
 function getDateRangeForActive(activeMonth) {
   const activeDate = parseDate(activeMonth);
   const minDate = new Date(activeDate.getFullYear(), activeDate.getMonth(), 1);
-  const maxDate = new Date(activeDate.getFullYear(), activeDate.getMonth() + 1, 0); // Last day of the active month
+  const maxDate = new Date(activeDate.getFullYear(), activeDate.getMonth() + 1, 0);
   return { minDate, maxDate };
 }
 
@@ -104,13 +114,57 @@ function isDateInRange(date, minDate, maxDate) {
   return date >= minDate && date <= maxDate;
 }
 
+function updateLastUpdated() {
+  const lastUpdated = document.getElementById('last-updated');
+  if (lastUpdated) {
+    const now = new Date(CURRENT_DATE); // Dùng CURRENT_DATE để đồng bộ thời gian
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    let displayDate;
+
+    // So sánh thời gian hiện tại với 11:00 AM
+    if (currentHour < 11 || (currentHour === 11 && currentMinute < 0)) {
+      // Trước 11:00 AM: giữ ngày hiện tại
+      displayDate = now;
+    } else {
+      // Từ 11:00 AM trở đi: hiển thị ngày hiện tại
+      displayDate = now;
+    }
+
+    const formattedDate = formatDateToDDMMYYYY(displayDate);
+    lastUpdated.textContent = `11:00 am - ${formattedDate}`;
+  }
+}
+
+let currentPage = 1;
+let totalPages = 1;
+let filteredStores = [];
+let userEmail = '';
+
+const observer = new IntersectionObserver((entries) => {
+  if (entries[0].isIntersecting && currentPage < totalPages && typeof progressByStore !== 'undefined') {
+    currentPage++;
+    updateTable(filteredStores, progressByStore, userEmail, picInfo, dropdownChurnActions, dropdownActiveActions, dropdownWhyReasons);
+  }
+}, { threshold: 0.1 });
+
+// Add sentinel element for Intersection Observer
+function addSentinel() {
+  const sentinel = document.createElement('tr');
+  sentinel.id = 'sentinel';
+  sentinel.style.height = '1px'; // Đảm bảo không ảnh hưởng giao diện
+  document.getElementById('stores-body').appendChild(sentinel);
+  observer.observe(sentinel); // Quan sát sentinel thay vì tbody
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
-  // const userEmail = sessionStorage.userEmail;
-  const userEmail = 'duong.doan@kamereo.vn';
+  userEmail = 'duong.doan@kamereo.vn';
   if (!userEmail) {
     window.location.href = 'index.html';
     return;
   }
+
+  updateLastUpdated();
 
   const cacheKey = `homeData_${userEmail}`;
   let cachedData;
@@ -125,7 +179,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const now = new Date().getTime();
   if (cachedData && cachedData.data && cachedData.timestamp && now - cachedData.timestamp < CACHE_DURATION) {
-    console.log('Data loaded from localStorage');
     displayData(cachedData.data, userEmail);
   } else {
     await fetchAndDisplayData(userEmail, cacheKey);
@@ -137,7 +190,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       localStorage.removeItem(cacheKey);
       showNotification('Data refreshed successfully!', 'success');
-      // Refresh the entire page after clearing localStorage
+      updateLastUpdated();
       window.location.reload();
     } catch (error) {
       console.error('Error resetting data:', error);
@@ -146,6 +199,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       hideLoading();
     }
   });
+
+  addSentinel(); // Thêm sentinel khi khởi tạo
 });
 
 async function fetchAndDisplayData(userEmail, cacheKey) {
@@ -173,10 +228,6 @@ async function fetchAndDisplayData(userEmail, cacheKey) {
       timestamp: now
     }));
 
-    // Clear the table before displaying new data
-    const tbody = document.getElementById('stores-body');
-    tbody.innerHTML = '';
-
     displayData(data, userEmail);
   } catch (error) {
     console.error('Error fetching data:', error);
@@ -187,7 +238,8 @@ async function fetchAndDisplayData(userEmail, cacheKey) {
   }
 }
 
-async function displayData(data, userEmail) {
+async function displayData(data, userEmailParam) {
+  userEmail = userEmailParam; // Cập nhật userEmail toàn cục
   if (!data || !data.picInfo || !data.stores || !Array.isArray(data.stores)) {
     console.error('Invalid data:', data);
     showNotification('Invalid data. Please log in again.', 'error');
@@ -195,16 +247,17 @@ async function displayData(data, userEmail) {
     return;
   }
 
-  const { picInfo, stores } = data;
+  const { picInfo: picInfoData, stores } = data;
+  picInfo = picInfoData; // Cập nhật picInfo toàn cục
   document.getElementById('pic-name').textContent = picInfo.fullName || 'N/A';
   document.getElementById('pic-email').textContent = picInfo.email || 'N/A';
   document.getElementById('pic-team').textContent = picInfo.team || 'N/A';
   document.getElementById('pic-subteam').textContent = picInfo.subteam || 'N/A';
 
-  let progressByStore = {};
-  let dropdownChurnActions = {};
-  let dropdownActiveActions = [];
-  let dropdownWhyReasons = {};
+  progressByStore = {}; // Khởi tạo lại progressByStore
+  dropdownChurnActions = {};
+  dropdownActiveActions = [];
+  dropdownWhyReasons = {};
 
   try {
     const [progressResponse, churnActionsResponse, activeActionsResponse, whyReasonsResponse] = await Promise.all([
@@ -255,7 +308,7 @@ async function displayData(data, userEmail) {
   }
 
   const picFilter = document.getElementById('pic-filter');
-  picFilter.innerHTML = '<option value="All">All</option>'; // Reset PIC filter
+  picFilter.innerHTML = '<option value="All">All</option>';
   const uniquePICs = [...new Set(stores.map(store => store.finalCurrentPIC).filter(pic => pic && pic !== 'N/A'))];
   uniquePICs.sort();
   uniquePICs.forEach(pic => {
@@ -265,35 +318,74 @@ async function displayData(data, userEmail) {
     picFilter.appendChild(option);
   });
 
-  let filteredStores = [...stores];
+  filteredStores = [...stores];
+
+  // Sắp xếp filteredStores ngay từ đầu
+  filteredStores.sort((a, b) => {
+    const noDaysNoBuyA = calculateDaysSinceLastOrder(a.lastOrderDate);
+    const noDaysNoBuyB = calculateDaysSinceLastOrder(b.lastOrderDate);
+    const isCriticalA = a.statusChurnThisMonth === 'Active' && noDaysNoBuyA > 20;
+    const isCriticalB = b.statusChurnThisMonth === 'Active' && noDaysNoBuyB > 20;
+
+    // Ưu tiên các store Active và chưa mua trên 20 ngày
+    if (isCriticalA && !isCriticalB) return -1;
+    if (!isCriticalA && isCriticalB) return 1;
+
+    // Nếu cả hai đều là "critical", sắp xếp theo số ngày chưa mua (giảm dần)
+    if (isCriticalA && isCriticalB) {
+      // Xử lý trường hợp Infinity
+      if (noDaysNoBuyA === Infinity && noDaysNoBuyB === Infinity) return 0;
+      if (noDaysNoBuyA === Infinity) return -1; // Store A chưa mua lâu hơn
+      if (noDaysNoBuyB === Infinity) return 1;  // Store B chưa mua lâu hơn
+      return noDaysNoBuyB - noDaysNoBuyA; // So sánh bình thường
+    }
+
+    // Còn lại, sắp xếp theo ngày đặt hàng cuối (mới nhất lên đầu)
+    const dateA = a.lastOrderDate ? parseDate(a.lastOrderDate) : new Date(0);
+    const dateB = b.lastOrderDate ? parseDate(b.lastOrderDate) : new Date(0);
+    return dateB - dateA || (a.storeId.localeCompare(b.storeId));
+  });
+
+  // Log filteredStores sau khi sắp xếp để kiểm tra
+  filteredStores.forEach((store, index) => {
+    const noDaysNoBuy = calculateDaysSinceLastOrder(store.lastOrderDate);
+    const isCritical = store.statusChurnThisMonth === 'Active' && noDaysNoBuy > 20;
+    // console.log(`Initial Sorted Store [${index}]: ${store.storeId}, Status: ${store.statusChurnThisMonth}, Last Order: ${store.lastOrderDate}, No Days No Buy: ${noDaysNoBuy}, Is Critical: ${isCritical}`);
+  });
+
+  totalPages = Math.ceil(filteredStores.length / ITEMS_PER_PAGE);
   updateTable(filteredStores, progressByStore, userEmail, picInfo, dropdownChurnActions, dropdownActiveActions, dropdownWhyReasons);
 
   const statusFilter = document.getElementById('status-filter');
-  statusFilter.addEventListener('change', () => {
+  statusFilter.addEventListener('change', debounce(() => {
     applyFilters(stores, progressByStore, userEmail, picInfo, dropdownChurnActions, dropdownActiveActions, dropdownWhyReasons);
-  });
+  }, 300));
 
-  picFilter.addEventListener('change', () => {
+  picFilter.addEventListener('change', debounce(() => {
     applyFilters(stores, progressByStore, userEmail, picInfo, dropdownChurnActions, dropdownActiveActions, dropdownWhyReasons);
-  });
+  }, 300));
 
   const searchInputs = ['store-id', 'store-name', 'buyer-id'];
   searchInputs.forEach(field => {
     const input = document.getElementById(`search-${field}`);
-    input.addEventListener('input', () => {
+    input.addEventListener('input', debounce(() => {
       applyFilters(stores, progressByStore, userEmail, picInfo, dropdownChurnActions, dropdownActiveActions, dropdownWhyReasons);
-    });
+    }, 300));
   });
 }
 
 function applyFilters(stores, progressByStore, userEmail, picInfo, dropdownChurnActions, dropdownActiveActions, dropdownWhyReasons) {
+  // Log để kiểm tra số lượng store Active trong toàn bộ danh sách
+  const activeStoresCount = stores.filter(store => store.statusChurnThisMonth === 'Active').length;
+  // console.log(`Total stores: ${stores.length}, Active stores: ${activeStoresCount}`);
+
   const searchStoreId = document.getElementById('search-store-id').value.trim().toLowerCase();
   const searchStoreName = document.getElementById('search-store-name').value.trim().toLowerCase();
   const searchBuyerId = document.getElementById('search-buyer-id').value.trim().toLowerCase();
   const statusFilter = document.getElementById('status-filter').value;
   const picFilter = document.getElementById('pic-filter').value;
 
-  let filteredStores = [...stores];
+  filteredStores = [...stores];
 
   if (searchStoreId) {
     filteredStores = filteredStores.filter(store => 
@@ -325,29 +417,83 @@ function applyFilters(stores, progressByStore, userEmail, picInfo, dropdownChurn
     );
   }
 
-  updateTable(filteredStores, progressByStore, userEmail, picInfo, dropdownChurnActions, dropdownActiveActions, dropdownWhyReasons);
-}
+  // Log sau khi lọc
+  const activeStoresAfterFilter = filteredStores.filter(store => store.statusChurnThisMonth === 'Active').length;
+  // console.log(`Filtered stores: ${filteredStores.length}, Active stores after filter: ${activeStoresAfterFilter}`);
 
-function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnActions, dropdownActiveActions, dropdownWhyReasons) {
-  const tbody = document.getElementById('stores-body');
-  tbody.innerHTML = ''; // Clear the table before updating
-
-  const sortedStores = [...stores].sort((a, b) => {
+  // Sắp xếp toàn bộ filteredStores trước khi phân trang
+  filteredStores.sort((a, b) => {
     const noDaysNoBuyA = calculateDaysSinceLastOrder(a.lastOrderDate);
     const noDaysNoBuyB = calculateDaysSinceLastOrder(b.lastOrderDate);
     const isCriticalA = a.statusChurnThisMonth === 'Active' && noDaysNoBuyA > 20;
     const isCriticalB = b.statusChurnThisMonth === 'Active' && noDaysNoBuyB > 20;
 
+    // Ưu tiên các store Active và chưa mua trên 20 ngày
     if (isCriticalA && !isCriticalB) return -1;
     if (!isCriticalA && isCriticalB) return 1;
 
+    // Nếu cả hai đều là "critical", sắp xếp theo số ngày chưa mua (giảm dần)
+    if (isCriticalA && isCriticalB) {
+      // Xử lý trường hợp Infinity
+      if (noDaysNoBuyA === Infinity && noDaysNoBuyB === Infinity) return 0;
+      if (noDaysNoBuyA === Infinity) return -1; // Store A chưa mua lâu hơn
+      if (noDaysNoBuyB === Infinity) return 1;  // Store B chưa mua lâu hơn
+      return noDaysNoBuyB - noDaysNoBuyA; // So sánh bình thường
+    }
+
+    // Còn lại, sắp xếp theo ngày đặt hàng cuối (mới nhất lên đầu)
     const dateA = a.lastOrderDate ? parseDate(a.lastOrderDate) : new Date(0);
     const dateB = b.lastOrderDate ? parseDate(b.lastOrderDate) : new Date(0);
     return dateB - dateA || (a.storeId.localeCompare(b.storeId));
   });
 
+  // Log filteredStores sau khi sắp xếp để kiểm tra
+  filteredStores.forEach((store, index) => {
+    const noDaysNoBuy = calculateDaysSinceLastOrder(store.lastOrderDate);
+    const isCritical = store.statusChurnThisMonth === 'Active' && noDaysNoBuy > 20;
+    // console.log(`Sorted Store [${index}]: ${store.storeId}, Status: ${store.statusChurnThisMonth}, Last Order: ${store.lastOrderDate}, No Days No Buy: ${noDaysNoBuy}, Is Critical: ${isCritical}`);
+  });
+
+  currentPage = 1;
+  totalPages = Math.ceil(filteredStores.length / ITEMS_PER_PAGE);
+  updateTable(filteredStores, progressByStore, userEmail, picInfo, dropdownChurnActions, dropdownActiveActions, dropdownWhyReasons);
+}
+
+async function fetchProgressForStore(storeId) {
+  try {
+    const response = await fetch(`${PROXY_URL}/progress`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: userEmail, storeId })
+    });
+    if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+    const data = await response.json();
+    return data[storeId] || [];
+  } catch (error) {
+    console.error(`Error fetching progress for store ${storeId}:`, error);
+    return [];
+  }
+}
+
+function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnActions, dropdownActiveActions, dropdownWhyReasons) {
+  // console.log(`Current Page: ${currentPage}, Total Pages: ${totalPages}`); // Thêm log để debug
+
+  const tbody = document.getElementById('stores-body');
+  const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIdx = startIdx + ITEMS_PER_PAGE;
+  const paginatedStores = stores.slice(startIdx, endIdx);
+
+  if (currentPage === 1) tbody.innerHTML = ''; // Clear only on first page
+
+  // Thêm log để kiểm tra dữ liệu trong trang hiện tại
+  paginatedStores.forEach(store => {
+    const noDaysNoBuy = calculateDaysSinceLastOrder(store.lastOrderDate);
+    const isCritical = store.statusChurnThisMonth === 'Active' && noDaysNoBuy > 20;
+    // console.log(`Store: ${store.storeId}, Status: ${store.statusChurnThisMonth}, Last Order: ${store.lastOrderDate}, No Days No Buy: ${noDaysNoBuy}, Is Critical: ${isCritical}`);
+  });
+
   requestAnimationFrame(() => {
-    sortedStores.forEach(store => {
+    paginatedStores.forEach(store => {
       const noDaysNoBuy = calculateDaysSinceLastOrder(store.lastOrderDate);
       const lastOrderDisplay = store.lastOrderDate || 'N/A';
       const isCritical = store.statusChurnThisMonth === 'Active' && noDaysNoBuy > 20;
@@ -364,14 +510,15 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
         <td>${store.finalCurrentPIC || 'N/A'}</td>
         <td>${store.statusChurnThisMonth || 'N/A'}</td>
         <td>
-          <button class="action-button" aria-label="Add action for store ${store.storeId || 'N/A'}">Action</button>
-          <button class="journey-button" aria-label="View progress for store ${store.storeId || 'N/A'}">Journey</button>
+          <button class="action-button" data-store-id="${store.storeId || 'N/A'}">Action</button>
+          <button class="journey-button" data-store-id="${store.storeId || 'N/A'}">Journey</button>
         </td>
       `;
       tbody.appendChild(row);
 
       const progressRow = document.createElement('tr');
       progressRow.className = 'progress-row';
+      progressRow.setAttribute('data-store-id', store.storeId || 'N/A');
       const progressItems = progressByStore[store.storeId] || [];
       const subTableContent = progressItems.map(item => {
         const isChurn = !!item.churnMonth;
@@ -434,13 +581,15 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
 
       const journeyBtn = row.querySelector('.journey-button');
       journeyBtn.addEventListener('click', () => {
-        const isCurrentlyOpen = progressRow.classList.contains('open');
+        const storeId = journeyBtn.getAttribute('data-store-id');
+        const targetRow = tbody.querySelector(`.progress-row[data-store-id="${storeId}"]`);
+        const isCurrentlyOpen = targetRow.classList.contains('open');
         if (isCurrentlyOpen) {
-          progressRow.classList.remove('open');
+          targetRow.classList.remove('open');
           journeyBtn.classList.remove('active');
           row.classList.remove('open-row');
         } else {
-          progressRow.classList.add('open');
+          targetRow.classList.add('open');
           journeyBtn.classList.add('active');
           row.classList.add('open-row');
         }
@@ -448,11 +597,13 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
 
       const actionBtn = row.querySelector('.action-button');
       actionBtn.addEventListener('click', async () => {
+        const storeId = actionBtn.getAttribute('data-store-id');
         const modal = document.getElementById('action-modal');
         modal.classList.add('active');
 
-        document.getElementById('modal-store-id').value = store.storeId || 'N/A';
-        document.getElementById('modal-store-name').value = store.storeName || 'N/A';
+        document.getElementById('modal-store-id').value = storeId || 'N/A';
+        const store = stores.find(s => s.storeId === storeId);
+        document.getElementById('modal-store-name').value = store ? store.storeName || 'N/A' : 'N/A';
         document.getElementById('modal-pic').value = userEmail.split('@')[0];
         document.getElementById('modal-subteam').value = picInfo.subteam || 'N/A';
         document.getElementById('modal-contact-date').value = '';
@@ -471,7 +622,7 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
           const activeHistoryResponse = await fetch(`${PROXY_URL}/active-history`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ storeId: store.storeId })
+            body: JSON.stringify({ storeId })
           });
           if (!activeHistoryResponse.ok) throw new Error(`HTTP error! Status: ${activeHistoryResponse.status}`);
           activeHistory = await activeHistoryResponse.json();
@@ -482,7 +633,7 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
             activeMonthSelect.appendChild(option);
           });
 
-          if (store.statusChurnThisMonth === 'Active' && calculateDaysSinceLastOrder(store.lastOrderDate) <= 30) {
+          if (store && store.statusChurnThisMonth === 'Active' && calculateDaysSinceLastOrder(store.lastOrderDate) <= 30) {
             const currentMonth = formatMonthYear(CURRENT_DATE);
             const option = document.createElement('option');
             option.value = currentMonth;
@@ -500,12 +651,12 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
           console.error('Error fetching Active History:', error);
           const option = document.createElement('option');
           option.value = 'N/A';
-          option.textContent = store.statusChurnThisMonth === 'Active' ? 'N/A (Current Active)' : 'N/A';
+          option.textContent = store && store.statusChurnThisMonth === 'Active' ? 'N/A (Current Active)' : 'N/A';
           activeMonthSelect.appendChild(option);
           activeMonthSelect.value = 'N/A';
         }
 
-        const progressItems = progressByStore[store.storeId] || [];
+        const progressItems = progressByStore[storeId] || [];
         const latestChurn = progressItems.find(item => !!item.churnMonth);
 
         const churnToggle = document.getElementById('churn-toggle');
@@ -513,17 +664,18 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
         const churnFields = document.querySelectorAll('.churn-field');
         const activeFields = document.querySelectorAll('.active-field');
         const contactDateInput = document.getElementById('modal-contact-date');
+        const churnMonthInput = document.getElementById('modal-churn-month');
 
-        const hasChurn = !!latestChurn;
         let dateRange = { minDate: null, maxDate: null };
 
-        if (hasChurn) {
+        if (latestChurn && store.statusChurnThisMonth === 'Churn') {
           churnToggle.classList.add('active');
           activeToggle.classList.remove('active');
           churnFields.forEach(field => field.style.display = 'block');
           activeFields.forEach(field => field.style.display = 'none');
           churnToggle.disabled = false;
-          document.getElementById('modal-churn-month').value = latestChurn.churnMonth || store.lastOrderDate || 'N/A';
+          whyNotReawakenSelect.style.display = 'block';
+          churnMonthInput.value = latestChurn.churnMonth || store.lastOrderDate || 'N/A';
 
           dateRange = getDateRangeForChurn(latestChurn.churnMonth);
           contactDateInput.setAttribute('min', formatDateToYYYYMMDD(dateRange.minDate));
@@ -551,6 +703,8 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
           churnFields.forEach(field => field.style.display = 'none');
           activeFields.forEach(field => field.style.display = 'block');
           churnToggle.disabled = true;
+          whyNotReawakenSelect.style.display = 'none';
+          churnMonthInput.value = 'N/A';
 
           const selectedActiveMonth = activeMonthSelect.value || 'N/A';
           if (selectedActiveMonth !== 'N/A') {
@@ -565,13 +719,11 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
             option.textContent = action;
             actionSelect.appendChild(option);
           });
-          whyNotReawakenSelect.style.display = 'none';
         }
 
         document.getElementById('modal-note').value = '';
         document.getElementById('modal-why-not-reawaken').value = '';
 
-        // Force date format to yyyy/mm/dd when a date is selected
         contactDateInput.addEventListener('change', () => {
           const value = contactDateInput.value;
           if (value) {
@@ -588,14 +740,21 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
             activeFields.forEach(field => field.style.display = 'none');
             whyNotReawakenSelect.style.display = 'block';
 
-            dateRange = getDateRangeForChurn(latestChurn.churnMonth);
-            contactDateInput.setAttribute('min', formatDateToYYYYMMDD(dateRange.minDate));
-            contactDateInput.setAttribute('max', formatDateToYYYYMMDD(dateRange.maxDate));
-            contactDateInput.value = ''; // Reset Contact Date
+            if (latestChurn) {
+              dateRange = getDateRangeForChurn(latestChurn.churnMonth);
+              contactDateInput.setAttribute('min', formatDateToYYYYMMDD(dateRange.minDate));
+              contactDateInput.setAttribute('max', formatDateToYYYYMMDD(dateRange.maxDate));
+              churnMonthInput.value = latestChurn.churnMonth || store.lastOrderDate || 'N/A';
+            } else {
+              contactDateInput.removeAttribute('min');
+              contactDateInput.removeAttribute('max');
+              churnMonthInput.value = 'N/A';
+            }
+            contactDateInput.value = '';
 
             actionSelect.innerHTML = '<option value="">Select action</option>';
             whyNotReawakenSelect.innerHTML = '<option value="">Select reason</option>';
-            if (hasChurn) {
+            if (latestChurn) {
               const churnType = latestChurn.typeOfChurn || '';
               const availableChurnActions = dropdownChurnActions[churnType] || [];
               availableChurnActions.forEach(action => {
@@ -628,11 +787,11 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
             dateRange = getDateRangeForActive(selectedActiveMonth);
             contactDateInput.setAttribute('min', formatDateToYYYYMMDD(dateRange.minDate));
             contactDateInput.setAttribute('max', formatDateToYYYYMMDD(dateRange.maxDate));
-            contactDateInput.value = ''; // Reset Contact Date
+            contactDateInput.value = '';
           } else {
             contactDateInput.removeAttribute('min');
             contactDateInput.removeAttribute('max');
-            contactDateInput.value = ''; // Reset Contact Date
+            contactDateInput.value = '';
           }
 
           actionSelect.innerHTML = '<option value="">Select action</option>';
@@ -652,22 +811,27 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
             dateRange = getDateRangeForActive(selectedActiveMonth);
             contactDateInput.setAttribute('min', formatDateToYYYYMMDD(dateRange.minDate));
             contactDateInput.setAttribute('max', formatDateToYYYYMMDD(dateRange.maxDate));
-            contactDateInput.value = ''; // Reset Contact Date
+            contactDateInput.value = '';
           } else {
             contactDateInput.removeAttribute('min');
             contactDateInput.removeAttribute('max');
-            contactDateInput.value = ''; // Reset Contact Date
+            contactDateInput.value = '';
           }
         });
       });
     });
+
+    // Đảm bảo sentinel ở cuối
+    const sentinel = document.getElementById('sentinel');
+    if (sentinel) tbody.appendChild(sentinel); // Di chuyển sentinel xuống cuối
+    else addSentinel(); // Nếu chưa có sentinel, thêm mới
 
     const modal = document.getElementById('action-modal');
     const closeBtn = modal.querySelector('.close');
     const resetModal = () => {
       modal.classList.remove('active');
       document.getElementById('modal-note').value = '';
-      document.getElementById('modal-contact-date').value = ''; // Reset Contact Date
+      document.getElementById('modal-contact-date').value = '';
       const selectElements = modal.querySelectorAll('select');
       selectElements.forEach(select => {
         select.blur();
@@ -720,7 +884,6 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
         return;
       }
 
-      // Check for duplicate action
       const progressItems = progressByStore[storeId] || [];
       const isDuplicate = progressItems.some(item => {
         return item.actions.some(actionItem => 
@@ -741,7 +904,7 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
         storeId,
         storeName,
         action,
-        contactDate: formatDateToDDMMYYYY(selectedContactDate), // Send in DD/MM/YYYY format
+        contactDate: formatDateToDDMMYYYY(selectedContactDate),
         PIC: pic,
         subteam,
         typeOfContact,
@@ -765,27 +928,40 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
 
         const result = await response.json();
         if (result.success) {
-          showNotification('Action recorded successfully!', 'success');
-          
-          // Clear search inputs
+          // Cập nhật progressByStore cho store hiện tại
+          const updatedProgress = await fetchProgressForStore(storeId);
+          progressByStore[storeId] = updatedProgress;
+
+          // Cập nhật bảng mà không cần reload trang
+          currentPage = 1;
+          updateTable(filteredStores, progressByStore, userEmail, picInfo, dropdownChurnActions, dropdownActiveActions, dropdownWhyReasons);
+
           document.getElementById('search-store-id').value = '';
           document.getElementById('search-store-name').value = '';
           document.getElementById('search-buyer-id').value = '';
-
-          // Refresh the entire page after successful submission
-          window.location.reload();
+          
+          // Đợi loading tắt hoàn toàn trước khi hiển thị thông báo
+          hideLoading();
+          setTimeout(() => {
+            showNotification('Action recorded successfully!', 'success');
+          }, 300); // Delay 300ms để đảm bảo hiệu ứng loading hoàn tất
         } else {
-          showNotification('Error recording data: ' + (result.error || 'Unknown reason'), 'error');
+          hideLoading();
+          setTimeout(() => {
+            showNotification('Error recording data: ' + (result.error || 'Unknown reason'), 'error');
+          }, 300);
         }
       } catch (error) {
         console.error('Error submitting action:', error);
-        if (error.status === 429) {
-          showNotification('Too many requests. Please wait 1-2 minutes before trying again.', 'warning');
-        } else {
-          showNotification(error.message.includes('No internet') ? 'Please check your network connection.' : 'Error recording data: ' + (error.message || 'Please try again.'), 'error');
-        }
-      } finally {
         hideLoading();
+        setTimeout(() => {
+          if (error.status === 429) {
+            showNotification('Too many requests. Please wait 1-2 minutes before trying again.', 'warning');
+          } else {
+            showNotification(error.message.includes('No internet') ? 'Please check your network connection.' : 'Error recording data: ' + (error.message || 'Please try again.'), 'error');
+          }
+        }, 300);
+      } finally {
         submitBtn.disabled = false;
         resetModal();
       }
