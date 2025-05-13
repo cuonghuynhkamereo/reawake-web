@@ -106,7 +106,8 @@ function getDateRangeForChurn(churnMonth) {
 function getDateRangeForActive(activeMonth) {
   const activeDate = parseDate(activeMonth);
   const minDate = new Date(activeDate.getFullYear(), activeDate.getMonth(), 1);
-  const maxDate = new Date(activeDate.getFullYear(), activeDate.getMonth() + 1, 0);
+  const maxDate = new Date(activeDate.getFullYear(), activeDate.getMonth() + 1, 0); // Ngày cuối của tháng
+  maxDate.setHours(23, 59, 59, 999); // Đảm bảo lấy hết ngày cuối
   return { minDate, maxDate };
 }
 
@@ -668,41 +669,69 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
 
         let dateRange = { minDate: null, maxDate: null };
 
-        if (latestChurn && store.statusChurnThisMonth === 'Churn') {
-          churnToggle.classList.add('active');
-          activeToggle.classList.remove('active');
-          churnFields.forEach(field => field.style.display = 'block');
-          activeFields.forEach(field => field.style.display = 'none');
+        // Kiểm tra xem có lịch sử churn hay không để bật/tắt nút Churn
+        if (latestChurn) {
+          // Nếu có lịch sử churn, cho phép chọn cả Churn và Active
           churnToggle.disabled = false;
-          whyNotReawakenSelect.style.display = 'block';
-          churnMonthInput.value = latestChurn.churnMonth || store.lastOrderDate || 'N/A';
+          // Mặc định chọn tab Active nếu store có status Active
+          if (store.statusChurnThisMonth === 'Active') {
+            activeToggle.classList.add('active');
+            churnToggle.classList.remove('active');
+            activeFields.forEach(field => field.style.display = 'block');
+            churnFields.forEach(field => field.style.display = 'none');
+            whyNotReawakenSelect.style.display = 'none';
+            churnMonthInput.value = 'N/A';
 
-          dateRange = getDateRangeForChurn(latestChurn.churnMonth);
-          contactDateInput.setAttribute('min', formatDateToYYYYMMDD(dateRange.minDate));
-          contactDateInput.setAttribute('max', formatDateToYYYYMMDD(dateRange.maxDate));
+            const selectedActiveMonth = activeMonthSelect.value || 'N/A';
+            if (selectedActiveMonth !== 'N/A') {
+              dateRange = getDateRangeForActive(selectedActiveMonth);
+              contactDateInput.setAttribute('min', formatDateToYYYYMMDD(dateRange.minDate));
+              contactDateInput.setAttribute('max', formatDateToYYYYMMDD(dateRange.maxDate));
+            }
 
-          const churnType = latestChurn.typeOfChurn || '';
-          const availableChurnActions = dropdownChurnActions[churnType] || [];
-          availableChurnActions.forEach(action => {
-            const option = document.createElement('option');
-            option.value = action;
-            option.textContent = action;
-            actionSelect.appendChild(option);
-          });
+            dropdownActiveActions.forEach(action => {
+              const option = document.createElement('option');
+              option.value = action;
+              option.textContent = action;
+              actionSelect.appendChild(option);
+            });
+          } else {
+            // Nếu status là Churn, mặc định chọn tab Churn
+            churnToggle.classList.add('active');
+            activeToggle.classList.remove('active');
+            churnFields.forEach(field => field.style.display = 'block');
+            activeFields.forEach(field => field.style.display = 'none');
+            whyNotReawakenSelect.style.display = 'block';
+            churnMonthInput.value = latestChurn.churnMonth || store.lastOrderDate || 'N/A';
 
-          const availableWhyReasons = dropdownWhyReasons[churnType] || [];
-          availableWhyReasons.forEach(reason => {
-            const option = document.createElement('option');
-            option.value = reason;
-            option.textContent = reason;
-            whyNotReawakenSelect.appendChild(option);
-          });
+            dateRange = getDateRangeForChurn(latestChurn.churnMonth);
+            contactDateInput.setAttribute('min', formatDateToYYYYMMDD(dateRange.minDate));
+            contactDateInput.setAttribute('max', formatDateToYYYYMMDD(dateRange.maxDate));
+
+            const churnType = latestChurn.typeOfChurn || '';
+            const availableChurnActions = dropdownChurnActions[churnType] || [];
+            availableChurnActions.forEach(action => {
+              const option = document.createElement('option');
+              option.value = action;
+              option.textContent = action;
+              actionSelect.appendChild(option);
+            });
+
+            const availableWhyReasons = dropdownWhyReasons[churnType] || [];
+            availableWhyReasons.forEach(reason => {
+              const option = document.createElement('option');
+              option.value = reason;
+              option.textContent = reason;
+              whyNotReawakenSelect.appendChild(option);
+            });
+          }
         } else {
-          churnToggle.classList.remove('active');
+          // Nếu không có lịch sử churn, tắt nút Churn và mặc định chọn Active
+          churnToggle.disabled = true;
           activeToggle.classList.add('active');
+          churnToggle.classList.remove('active');
           churnFields.forEach(field => field.style.display = 'none');
           activeFields.forEach(field => field.style.display = 'block');
-          churnToggle.disabled = true;
           whyNotReawakenSelect.style.display = 'none';
           churnMonthInput.value = 'N/A';
 
