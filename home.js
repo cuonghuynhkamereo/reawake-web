@@ -159,7 +159,7 @@ function addSentinel() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  userEmail = 'duong.doan@kamereo.vn';
+  userEmail = sessionStorage.userEmail;
   if (!userEmail) {
     window.location.href = 'index.html';
     return;
