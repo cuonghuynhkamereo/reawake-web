@@ -35,6 +35,7 @@ body {
   align-items: center;
   justify-content: center;
   width: 800px; /* Mở rộng phạm vi chạy gấp đôi lên 400px */
+  z-index: 1;
 }
 
 .running-image {
@@ -77,6 +78,7 @@ body {
   font-size: 14px;
   font-weight: 500;
   transition: background-color 0.3s ease, transform 0.3s ease;
+  z-index: 2;
 }
 
 .reset-button:hover {
