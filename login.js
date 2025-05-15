@@ -1,4 +1,4 @@
-const PROXY_URL = 'http://localhost:3000';
+const PROXY_URL = 'https://reawake-server.onrender.com';
 
 function showLoading() {
   document.getElementById('loading').style.display = 'flex';
