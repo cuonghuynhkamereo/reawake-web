@@ -893,7 +893,6 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
 
       if (!contactDate || !typeOfContact || !action || (!isChurnActive && !activeMonth)) {
         showNotification('Please fill in all required fields: Contact Date, Type of Contact, Action, and Active Month (if applicable)!', 'error');
-        resetModal();
         return;
       }
 
@@ -909,7 +908,6 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
         const minFormatted = formatDateToYYYYMMDD(dateRange.minDate);
         const maxFormatted = formatDateToYYYYMMDD(dateRange.maxDate);
         showNotification(`Contact Date must be between ${minFormatted} and ${maxFormatted}!`, 'error');
-        resetModal();
         return;
       }
 
@@ -924,7 +922,6 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
       });
       if (isDuplicate) {
         showNotification('This action already exists for the selected date and type!', 'error');
-        resetModal();
         return;
       }
 
@@ -992,7 +989,7 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
         }, 300);
       } finally {
         submitBtn.disabled = false;
-        resetModal();
+        if (progressByStore[storeId]) resetModal(); // Chỉ đóng modal khi submit thành công
       }
     }, 300);
 
