@@ -39,7 +39,16 @@ h1 {
 }
 
 .g_id_signin {
-  margin: 20px auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin: 20px 0;
+}
+
+/* Override style của Google Sign-In button nếu cần */
+.g_id_signin > div {
+  margin: 0 auto !important;
 }
 
 .error {
