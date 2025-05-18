@@ -529,6 +529,26 @@ th:nth-child(8), td:nth-child(8) { width: 9%; }
   color: #718096;
 }
 
+.form-group select:disabled {
+  background-color: #EDEFF2;
+  color: #718096;
+  appearance: none; /* Removes the dropdown arrow */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  pointer-events: none; /* Prevents any interaction */
+  cursor: default;
+}
+
+/* Hide the dropdown arrow in various browsers */
+.form-group select:disabled::-ms-expand {
+  display: none;
+}
+
+/* Add a bit of padding to match input fields */
+.form-group select:disabled {
+  padding-right: 12px;
+}
+
 .form-group textarea {
   resize: vertical;
   min-height: 96px;
@@ -588,6 +608,28 @@ th:nth-child(8), td:nth-child(8) { width: 9%; }
 
 .notification.error {
   background-color: #E53E3E;
+}
+
+.filter-button {
+  padding: 5px 10px;
+  background-color: #3182CE;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: 'Inter', sans-serif;
+  transition: background-color 0.2s;
+  width: 100%;
+  display: block;
+}
+
+.filter-button:hover {
+  background-color: #2C5282;
+}
+
+.filter-button.active {
+  background-color: #2C5282;
 }
 
 @media (max-width: 768px) {
