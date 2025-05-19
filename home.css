@@ -130,24 +130,43 @@ h2 {
   font-weight: 600;
 }
 
-.search-row th {
-  padding: 8px;
+.search-row {
+  /* XÓA các dòng sau nếu có: */
+  /* display: flex; */
+  /* align-items: center; */
+  /* justify-content: space-between; */
+  padding: 0;
   background-color: #F9FAFB;
+  border-bottom: 1px solid #E2E8F0;
 }
 
-.search-row input, .search-row select {
+.search-row th {
+  padding: 4px 6px !important;
+  background-color: #F9FAFB;
+  border-bottom: 1px solid #E2E8F0;
+  vertical-align: middle;
+}
+
+.search-row input,
+.search-row select {
   width: 100%;
-  padding: 8px;
+  padding: 4px 6px !important;
   border: 1px solid #E2E8F0;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 13px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  line-height: 1.2;
   box-sizing: border-box;
 }
 
-.search-row input:focus, .search-row select:focus {
-  border-color: #2A6A5B;
-  box-shadow: 0 0 0 3px rgba(42, 106, 91, 0.1);
-  outline: none;
+/* Nếu muốn giảm chiều cao button Recent Actions */
+.search-row .filter-button {
+  padding: 4px 6px !important;
+  font-size: 13px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  line-height: 1.2;
 }
 
 table {
@@ -203,13 +222,13 @@ tr.open-row {
 }
 
 th:nth-child(1), td:nth-child(1) { width: 10%; }
-th:nth-child(2), td:nth-child(2) { width: 20%; }
-th:nth-child(3), td:nth-child(3) { width: 10%; }
-th:nth-child(4), td:nth-child(4) { width: 20%; }
-th:nth-child(5), td:nth-child(5) { width: 12%; }
-th:nth-child(6), td:nth-child(6) { width: 12%; }
-th:nth-child(7), td:nth-child(7) { width: 8%; }
-th:nth-child(8), td:nth-child(8) { width: 9%; }
+th:nth-child(2), td:nth-child(2) { width: 19%; }
+th:nth-child(3), td:nth-child(3) { width: 9%; }
+th:nth-child(4), td:nth-child(4) { width: 19%; }
+th:nth-child(5), td:nth-child(5) { width: 10%; }
+th:nth-child(6), td:nth-child(6) { width: 13%; }
+th:nth-child(7), td:nth-child(7) { width: 9%; }
+th:nth-child(8), td:nth-child(8) { width: 10%; }
 
 .warning-last-order {
   color: #e7a117;
@@ -632,6 +651,43 @@ th:nth-child(8), td:nth-child(8) { width: 9%; }
   background-color: #2C5282;
 }
 
+/* Style riêng cho week-filter */
+#week-filter.filter-button {
+  background-color: #2A6A5B;
+  color: #fff;
+  font-weight: 600;
+  border: 2px solid #2A6A5B;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 15px;
+  transition: background 0.2s, border 0.2s;
+  box-shadow: 0 2px 8px rgba(42,106,91,0.08);
+  min-width: 100px;
+  max-width: 160px;
+  text-align: left;
+}
+
+#week-filter.filter-button:focus {
+  outline: none;
+  border-color: #47cead;
+  background: #245B4D;
+}
+
+#week-filter.filter-button option {
+  color: #2A6A5B;
+  background: #fff;
+  font-weight: 500;
+}
+
+/* Đảm bảo dropdown không bị tràn trên mobile */
+@media (max-width: 768px) {
+  #week-filter.filter-button {
+    min-width: 120px;
+    font-size: 13px;
+    padding: 6px 8px;
+  }
+}
+
 @media (max-width: 768px) {
   .header-card {
     flex-direction: column;
@@ -746,4 +802,17 @@ th:nth-child(8), td:nth-child(8) { width: 9%; }
       transform: translateX(40%) translateY(0) scaleX(-1);
     }
   }
+}
+
+/* Căn giữa các nút trong cột Actions */
+td:nth-child(8) {
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* Hiển thị 2 nút trên cùng 1 dòng, căn giữa và có khoảng cách */
+.action-button,
+.journey-button {
+  display: inline-block;
+  vertical-align: middle;
 }

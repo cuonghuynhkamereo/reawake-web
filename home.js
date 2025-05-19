@@ -3,7 +3,6 @@ let dropdownChurnActions = {};
 let dropdownActiveActions = [];
 let dropdownWhyReasons = {};
 let picInfo = {};
-let recentActionsFilterActive = false; // Add this new global variable
 
 const PROXY_URL = 'https://reawake-server.onrender.com';
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
@@ -277,15 +276,6 @@ async function performFullDataRefresh() {
     document.getElementById('pic-filter').value = 'All';
     document.getElementById('status-filter').value = 'All';
     
-    // Reset recent actions filter if active
-    if (recentActionsFilterActive) {
-      recentActionsFilterActive = false;
-      const recentActionsFilterBtn = document.getElementById('recent-actions-filter');
-      if (recentActionsFilterBtn) {
-        recentActionsFilterBtn.classList.remove('active');
-      }
-    }
-    
     // Update last updated time
     updateLastUpdated();
     
@@ -480,23 +470,20 @@ async function displayData(data, userEmailParam) {
     }, 300));
   });
 
-  recentActionsFilterActive = false; // Reset the global variable when displaying data
-
-  // Add event listener for the recent actions filter button
-  const recentActionsFilterBtn = document.getElementById('recent-actions-filter');
-  recentActionsFilterBtn.addEventListener('click', function() {
-    recentActionsFilterActive = !recentActionsFilterActive;
-    
-    // Toggle active class
-    if (recentActionsFilterActive) {
-      recentActionsFilterBtn.classList.add('active');
-    } else {
-      recentActionsFilterBtn.classList.remove('active');
-    }
-    
-    // Reapply all filters
-    applyFilters(stores, progressByStore, userEmail, picInfo, dropdownChurnActions, dropdownActiveActions, dropdownWhyReasons);
+  const weekFilter = document.getElementById('week-filter');
+  weekFilter.innerHTML = '<option value="">All Weeks</option>';
+  getWeekOptions(progressByStore).forEach(opt => {
+    const option = document.createElement('option');
+    option.value = opt.value;
+    option.textContent = opt.label;
+    weekFilter.appendChild(option);
   });
+  weekFilter.value = '';
+
+  // Thêm sự kiện change cho weekFilter
+  weekFilter.addEventListener('change', debounce(() => {
+    applyFilters(stores, progressByStore, userEmail, picInfo, dropdownChurnActions, dropdownActiveActions, dropdownWhyReasons);
+  }, 300));
 }
 
 function applyFilters(stores, progressByStore, userEmail, picInfo, dropdownChurnActions, dropdownActiveActions, dropdownWhyReasons) {
@@ -509,6 +496,7 @@ function applyFilters(stores, progressByStore, userEmail, picInfo, dropdownChurn
   const searchBuyerId = document.getElementById('search-buyer-id').value.trim().toLowerCase();
   const statusFilter = document.getElementById('status-filter').value;
   const picFilter = document.getElementById('pic-filter').value;
+  const weekFilter = document.getElementById('week-filter').value;
 
   filteredStores = [...stores];
 
@@ -542,22 +530,21 @@ function applyFilters(stores, progressByStore, userEmail, picInfo, dropdownChurn
     );
   }
 
-  // Recent actions filter (last 7 days)
-  let matchesRecentActions = true;
-  if (recentActionsFilterActive) {
-    const today = new Date();
-    const sixDaysAgo = new Date();
-    sixDaysAgo.setDate(today.getDate() - 6);
-    
-    // Check if this store has any actions in the last 7 days
+  const selectedWeek = document.getElementById('week-filter').value;
+  if (selectedWeek) {
+    const weekStart = parseDate(selectedWeek);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+
     filteredStores = filteredStores.filter(store => {
       const storeProgress = progressByStore[store.storeId] || [];
-      return storeProgress.some(progress => {
-        return progress.actions && progress.actions.some(action => {
-          const actionDate = parseDate(action.contactDate); // Assuming DD/MM/YYYY format
-          return actionDate >= sixDaysAgo && actionDate <= today;
-        });
-      });
+      return storeProgress.some(progress =>
+        progress.actions && progress.actions.some(action => {
+          const actionDate = parseDate(action.contactDate);
+          return actionDate >= weekStart && actionDate <= weekEnd;
+        })
+      );
     });
   }
 
@@ -648,6 +635,42 @@ async function fetchAllProgress() {
   } finally {
     hideLoading();
   }
+}
+
+function getStartOfWeek(date) {
+  const d = new Date(date);
+  const day = d.getDay(); // 0 = Sunday
+  d.setDate(d.getDate() - day);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function getStartAndEndOfWeek(weekValue) {
+  const weekStart = parseDate(weekValue);
+  const startOfWeek = getStartOfWeek(weekStart);
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 6); // End of the week (7 days later)
+  return [startOfWeek, endOfWeek];
+}
+
+function getWeekOptions(progressByStore) {
+  const allDates = [];
+  Object.values(progressByStore).forEach(items => {
+    items.forEach(item => {
+      (item.actions || []).forEach(action => {
+        const d = parseDate(action.contactDate);
+        if (!isNaN(d)) allDates.push(getStartOfWeek(d).getTime());
+      });
+    });
+  });
+  const uniqueWeeks = Array.from(new Set(allDates)).sort((a, b) => b - a);
+  return uniqueWeeks.map(ts => {
+    const d = new Date(ts);
+    return {
+      value: formatDateToYYYYMMDD(d),
+      label: `${formatDateToDDMMYYYY(d)}`
+    };
+  });
 }
 
 function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnActions, dropdownActiveActions, dropdownWhyReasons) {
