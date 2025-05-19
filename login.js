@@ -25,40 +25,102 @@ function showSuccessModal() {
 
 async function handleCredentialResponse(response) {
   showLoading();
-  const profile = JSON.parse(atob(response.credential.split('.')[1]));
-  const userEmail = profile.email;
-  console.log('User email:', userEmail);
-  const loginError = document.getElementById('login-error');
-
-  if (!userEmail.endsWith('@kamereo.vn')) {
-    hideLoading();
-    loginError.textContent = 'Please use a company account (@kamereo.vn).';
-    loginError.style.display = 'block';
-    return;
-  }
-
   try {
-    const response = await fetch(`${PROXY_URL}/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: userEmail })
-    });
-    if (!navigator.onLine) throw new Error('No internet connection');
-    if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+    console.log("Auth response received, processing...");
+    
+    // Kiểm tra response có hợp lệ không
+    if (!response || !response.credential) {
+      console.error("Invalid credential response");
+      hideLoading();
+      document.getElementById('login-error').textContent = 'Invalid authentication response. Please try again.';
+      document.getElementById('login-error').style.display = 'block';
+      return;
+    }
+    
+    // Lấy phần payload của JWT
+    const parts = response.credential.split('.');
+    if (parts.length !== 3) {
+      console.error("JWT format invalid - expected 3 parts");
+      hideLoading();
+      document.getElementById('login-error').textContent = 'Authentication data format invalid.';
+      document.getElementById('login-error').style.display = 'block';
+      return;
+    }
+    
+    // Xử lý base64url thành base64 standard
+    let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    // Thêm padding nếu cần
+    while (base64.length % 4 !== 0) {
+      base64 += '=';
+    }
+    
+    // Decode base64 string với try-catch
+    let decodedData;
+    try {
+      decodedData = atob(base64);
+    } catch (error) {
+      console.error("Failed to decode base64:", error);
+      hideLoading();
+      document.getElementById('login-error').textContent = 'Error processing login information. Please try again.';
+      document.getElementById('login-error').style.display = 'block';
+      return;
+    }
+    
+    // Parse JSON
+    let profile;
+    try {
+      profile = JSON.parse(decodedData);
+    } catch (error) {
+      console.error("Failed to parse JSON:", error);
+      hideLoading();
+      document.getElementById('login-error').textContent = 'Error processing user information. Please try again.';
+      document.getElementById('login-error').style.display = 'block';
+      return;
+    }
+    
+    // Lấy email và tiếp tục xử lý
+    const userEmail = profile.email;
+    console.log("User email extracted:", userEmail);
+    const loginError = document.getElementById('login-error');
 
-    const data = await response.json();
-    if (data.success) {
-      sessionStorage.setItem('userEmail', userEmail);
-      showSuccessModal();
-    } else {
-      loginError.textContent = data.error || 'Email not found or account not active.';
+    if (!userEmail.endsWith('@kamereo.vn')) {
+      hideLoading();
+      loginError.textContent = 'Please use a company account (@kamereo.vn).';
       loginError.style.display = 'block';
+      return;
+    }
+
+    // Phần còn lại của code đăng nhập giữ nguyên
+    try {
+      const response = await fetch(`${PROXY_URL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userEmail })
+      });
+      if (!navigator.onLine) throw new Error('No internet connection');
+      if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+
+      const data = await response.json();
+      if (data.success) {
+        sessionStorage.setItem('userEmail', userEmail);
+        showSuccessModal();
+      } else {
+        loginError.textContent = data.error || 'Email not found or account not active.';
+        loginError.style.display = 'block';
+      }
+    } catch (error) {
+      console.error('Error checking email:', error);
+      loginError.textContent = error.message.includes('No internet') 
+        ? 'Please check your network connection.' 
+        : 'Error during sign-in. Please try again.';
+      loginError.style.display = 'block';
+    } finally {
+      hideLoading();
     }
   } catch (error) {
-    console.error('Error checking email:', error);
-    loginError.textContent = error.message.includes('No internet') ? 'Please check your network connection.' : 'Error during sign-in. Please try again.';
-    loginError.style.display = 'block';
-  } finally {
+    console.error('Error processing login:', error);
     hideLoading();
+    document.getElementById('login-error').textContent = 'Error during sign-in. Please try again.';
+    document.getElementById('login-error').style.display = 'block';
   }
 }

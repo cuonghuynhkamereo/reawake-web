@@ -4,7 +4,7 @@ let dropdownActiveActions = [];
 let dropdownWhyReasons = {};
 let picInfo = {};
 
-const PROXY_URL = 'https://reawake-server.onrender.com';
+const PROXY_URL = 'http://localhost:3000';
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 const CURRENT_DATE = new Date();
 const ITEMS_PER_PAGE = 20;
@@ -209,7 +209,7 @@ async function performFullDataRefresh() {
     localStorage.removeItem(cacheKey);
     
     // Fetch fresh customer data
-    const response = await fetch(`${PROXY_URL}/home`, {
+    const response = await fetch(`${PROXY_URL}/home?force=true`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: userEmail })
@@ -257,7 +257,7 @@ async function performFullDataRefresh() {
     }
     
     // THIS IS THE KEY CHANGE - fetch progress data with the same method used after submission
-    const progressResponse = await fetch(`${PROXY_URL}/progress`, {
+    const progressResponse = await fetch(`${PROXY_URL}/progress?force=true`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: userEmail })
@@ -1156,7 +1156,8 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
           // perform a full data refresh to ensure everything is up to date
           await performFullDataRefresh();
           
-          // Notification is now shown by the performFullDataRefresh function
+          // Hiển thị thông báo thành công sau khi refresh data xong
+          showNotification('Action submitted successfully!', 'success');
         } else {
           hideLoading();
           setTimeout(() => {
