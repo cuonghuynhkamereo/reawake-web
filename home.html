@@ -47,7 +47,9 @@
               <option value="Churn">Churn</option>
             </select>
           </th>
-          <th></th>
+          <th>
+            <button id="recent-actions-filter" class="filter-button">Recent Actions</button>
+          </th>
         </tr>
         <tr>
           <th>Store ID</th>
@@ -95,7 +97,7 @@
         </select>
       </div>
       <div class="form-group">
-        <label for="modal-contact-date">Contact Date (Date entered must be within valid month range):</label>
+        <label for="modal-contact-date">Contact Date (Only last 7 days are allowed):</label>
         <input type="date" id="modal-contact-date" required>
       </div>
       <div class="form-group">
