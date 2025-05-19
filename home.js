@@ -256,7 +256,7 @@ async function performFullDataRefresh() {
       });
     }
     
-    // THIS IS THE KEY CHANGE - fetch progress data with the same method used after submission
+    // Fetch progress data with the same method used after submission
     const progressResponse = await fetch(`${PROXY_URL}/progress?force=true`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -265,6 +265,9 @@ async function performFullDataRefresh() {
     
     if (progressResponse.ok) {
       progressByStore = await progressResponse.json();
+      
+      // THÊM VÀO ĐÂY: Cập nhật bộ lọc week với dữ liệu progress mới
+      updateWeekFilter(progressByStore);
     } else {
       throw new Error(`Failed to fetch progress data: ${progressResponse.status}`);
     }
@@ -1185,4 +1188,22 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
       if (!submitBtn.disabled) debouncedSubmit();
     });
   });
+}
+
+// Thêm hàm mới để cập nhật bộ lọc week
+function updateWeekFilter(progressByStore) {
+  const weekFilter = document.getElementById('week-filter');
+  const selectedWeek = weekFilter.value; // Lưu lại giá trị đã chọn
+  
+  weekFilter.innerHTML = '<option value="">All Weeks</option>';
+  getWeekOptions(progressByStore).forEach(opt => {
+    const option = document.createElement('option');
+    option.value = opt.value;
+    option.textContent = opt.label;
+    weekFilter.appendChild(option);
+  });
+  
+  // Kiểm tra xem tuần đã chọn trước đó có còn trong danh sách không
+  const weekExists = Array.from(weekFilter.options).some(option => option.value === selectedWeek);
+  weekFilter.value = weekExists ? selectedWeek : '';
 }

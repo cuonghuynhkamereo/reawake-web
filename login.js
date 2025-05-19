@@ -124,3 +124,55 @@ async function handleCredentialResponse(response) {
     document.getElementById('login-error').style.display = 'block';
   }
 }
+
+// Xử lý đăng nhập thủ công
+document.addEventListener('DOMContentLoaded', () => {
+  const manualLoginForm = document.getElementById('manual-login-form');
+  
+  if (manualLoginForm) {
+    manualLoginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const loginError = document.getElementById('login-error');
+      
+      // Kiểm tra định dạng email
+      if (!email.endsWith('@kamereo.vn')) {
+        loginError.textContent = 'Please use a company account (@kamereo.vn).';
+        loginError.style.display = 'block';
+        return;
+      }
+      
+      showLoading();
+      
+      try {
+        const response = await fetch(`${PROXY_URL}/manual-login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+          // Đăng nhập thành công
+          sessionStorage.setItem('userEmail', email);
+          showSuccessModal();
+        } else {
+          // Đăng nhập thất bại
+          loginError.textContent = data.error || 'Login failed. Please check your credentials.';
+          loginError.style.display = 'block';
+        }
+      } catch (error) {
+        console.error('Manual login error:', error);
+        loginError.textContent = error.message.includes('No internet')
+          ? 'Please check your network connection.'
+          : 'Error during sign-in. Please try again.';
+        loginError.style.display = 'block';
+      } finally {
+        hideLoading();
+      }
+    });
+  }
+});
