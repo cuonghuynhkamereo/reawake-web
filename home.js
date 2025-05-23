@@ -4,7 +4,7 @@ let dropdownActiveActions = [];
 let dropdownWhyReasons = {};
 let picInfo = {};
 
-const PROXY_URL = 'https://reawake-server.onrender.com';
+const PROXY_URL = 'http://localhost:3000';
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 const CURRENT_DATE = new Date();
 const ITEMS_PER_PAGE = 20;
@@ -1056,6 +1056,7 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
     const resetModal = () => {
       modal.classList.remove('active');
       document.getElementById('modal-note').value = '';
+      document.getElementById('modal-link-hubspot').value = ''; // Thêm dòng này
       document.getElementById('modal-contact-date').value = '';
       const selectElements = modal.querySelectorAll('select');
       selectElements.forEach(select => {
@@ -1081,6 +1082,7 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
       const typeOfContact = document.getElementById('modal-type-of-contact').value;
       const action = document.getElementById('modal-action').value;
       const note = document.getElementById('modal-note').value;
+      const linkHubspot = document.getElementById('modal-link-hubspot').value; // Thêm dòng này
       const whyNotReawaken = document.getElementById('modal-why-not-reawaken').value;
       const churnToggle = document.getElementById('churn-toggle');
       const isChurnActive = !churnToggle.disabled && churnToggle.classList.contains('active');
@@ -1134,6 +1136,7 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
         subteam,
         typeOfContact,
         note,
+        linkHubspot, // Thêm dòng này
         whyNotReawaken,
         churnMonthLastOrderDate,
         activeMonth
@@ -1193,17 +1196,27 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
 // Thêm hàm mới để cập nhật bộ lọc week
 function updateWeekFilter(progressByStore) {
   const weekFilter = document.getElementById('week-filter');
-  const selectedWeek = weekFilter.value; // Lưu lại giá trị đã chọn
-  
-  weekFilter.innerHTML = '<option value="">All Weeks</option>';
-  getWeekOptions(progressByStore).forEach(opt => {
+  const selectedWeek = weekFilter.value;
+
+  // Tạo fragment để batch update
+  const fragment = document.createDocumentFragment();
+  const defaultOption = document.createElement('option');
+  defaultOption.value = '';
+  defaultOption.textContent = 'All Weeks';
+  fragment.appendChild(defaultOption);
+
+  const weekOptions = getWeekOptions(progressByStore);
+  weekOptions.forEach(opt => {
     const option = document.createElement('option');
     option.value = opt.value;
     option.textContent = opt.label;
-    weekFilter.appendChild(option);
+    fragment.appendChild(option);
   });
-  
-  // Kiểm tra xem tuần đã chọn trước đó có còn trong danh sách không
-  const weekExists = Array.from(weekFilter.options).some(option => option.value === selectedWeek);
+
+  weekFilter.innerHTML = '';
+  weekFilter.appendChild(fragment);
+
+  // Giữ lại tuần đã chọn nếu còn tồn tại
+  const weekExists = weekOptions.some(opt => opt.value === selectedWeek);
   weekFilter.value = weekExists ? selectedWeek : '';
 }
