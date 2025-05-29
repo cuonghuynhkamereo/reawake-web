@@ -6,6 +6,7 @@
   <title>Home Page</title>
   <link rel="stylesheet" href="home.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
 <body>
   <div class="header-card">
@@ -15,13 +16,29 @@
       <p><strong>Team:</strong> <span id="pic-team">N/A</span></p>
       <p><strong>Subteam:</strong> <span id="pic-subteam">N/A</span></p>
       <p><strong>Last updated customer list:</strong> <span id="last-updated"></span></p>
+      <p><strong>Video hướng dẫn 🎥: </strong><a href="https://www.youtube.com/watch?v=o0tkkG4PPUg" target="_blank">Youtube</a></p>
     </div>
     <div class="header-animation">
-      <img src="image/kamereo_run.png" alt="Kamereo Running" class="running-image">
+      <div class="chat-container">
+        <div class="chat-bubbles">
+          <!-- Chat bubbles will be dynamically loaded here -->
+          <div class="chat-bubble active">Loading messages...</div>
+        </div>
+        <div class="character">
+          <img src="image/kamereo_run.png" alt="Kamereo Character">
+        </div>
+      </div>
     </div>
     <div class="header-actions">
-      <button id="reset-button" class="reset-button">Reset</button>
-      <img src="image/logo.png" alt="Kamereo Churn Management Logo" class="logo">
+      <div class="header-actions-1">
+        <button id="reset-button" class="reset-button">
+          <i class="fas fa-sync-alt"></i> Reset
+        </button>
+        <button id="export-button" class="export-button">
+          <i class="fas fa-file-export"></i> Export
+        </button>
+      </div>
+      <img src="image/logo.png" alt="Company Logo" class="logo">
     </div>
   </div>
 
@@ -144,9 +161,34 @@
     </div>
   </div>
 
+  <!-- Đảm bảo notification markup hiện diện trong HTML -->
   <div class="notification" id="notification">
     <span id="notification-message"></span>
   </div>
 
+  <!-- Cập nhật success modal -->
+  <div class="success-modal" id="success-modal">
+    <div class="success-modal-content">
+      <!-- Bỏ div success-icon -->
+      <h3>Action Submitted Successfully!</h3>
+      <p>Click 'Reset' button to see the latest data.</p>
+      <button id="success-ok-btn"><i class="fas fa-check"></i> OK</button>
+    </div>
+  </div>
+
+  <!-- Cập nhật confirmation modal -->
+  <div class="confirmation-modal" id="export-confirmation-modal">
+    <div class="confirmation-modal-content">
+      <!-- dialog_box.png sẽ hiển thị ở đây do CSS ::before -->
+      <h3>Export Data</h3>
+      <p>Do you want to export data with the current filters?</p>
+      <div class="confirmation-buttons">
+        <button id="export-yes-btn" class="confirm-btn"><i class="fas fa-check"></i> Yes</button>
+        <button id="export-no-btn" class="cancel-btn"><i class="fas fa-times"></i> No</button>
+      </div>
+    </div>
+  </div>
+
   <script src="home.js"></script>
+</body>
 </html>

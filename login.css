@@ -234,3 +234,32 @@ h1 {
 .login-button:hover {
   background-color: #245B4D;
 }
+
+/* Thêm style cho BOS footer */
+.bos-footer {
+  position: fixed;
+  margin-top: 25px;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.bos-logo {
+  width: 100px;
+  height: auto;
+}
+
+/* Responsive adjustment */
+@media (max-width: 768px) {
+  .bos-footer {
+    position: relative;
+    margin-top: 30px;
+  }
+  
+  .bos-logo {
+    width: 60px;
+  }
+}

@@ -17,20 +17,54 @@ function hideLoading() {
   document.getElementById('loading').style.display = 'none';
 }
 
-function showNotification(message, type = 'success') {
-  const notification = document.getElementById('notification');
+// Cập nhật hàm hiển thị notification
+function showNotification(message, type = 'info') {
+  // Kiểm tra xem notification đã tồn tại hay chưa, nếu chưa thì tạo mới
+  let notification = document.getElementById('notification');
+  if (!notification) {
+    notification = document.createElement('div');
+    notification.id = 'notification';
+    notification.className = 'notification';
+    
+    const messageElement = document.createElement('span');
+    messageElement.id = 'notification-message';
+    notification.appendChild(messageElement);
+    
+    document.body.appendChild(notification);
+  }
+  
   const messageElement = document.getElementById('notification-message');
+  if (!messageElement) {
+    console.error('Notification message element not found');
+    return;
+  }
   
+  // Đặt nội dung thông báo
   messageElement.textContent = message;
-  notification.className = `notification ${type}`;
-  notification.classList.add('show');
   
-  // Use longer duration for errors
-  const duration = type === 'error' ? 6000 : 3000;
+  // Xóa animation timeout cũ nếu có
+  if (window.notificationTimeout) {
+    clearTimeout(window.notificationTimeout);
+  }
   
+  // Xóa tất cả class trước đó
+  notification.className = 'notification';
+  
+  // Buộc trình duyệt redraw
+  void notification.offsetWidth;
+  
+  // Thêm class loại thông báo
+  notification.classList.add(type);
+  
+  // Hiển thị notification
   setTimeout(() => {
-    notification.classList.remove('show');
-  }, duration);
+    notification.classList.add('active');
+  }, 10);
+  
+  // Tự động ẩn sau 5 giây
+  window.notificationTimeout = setTimeout(() => {
+    notification.classList.remove('active');
+  }, 5000);
 }
 
 function debounce(func, wait) {
@@ -54,34 +88,51 @@ function debounce(func, wait) {
   };
 }
 
-function parseDate(dateStr) {
-  if (!dateStr) return new Date(0);
-  const formats = [
-    { pattern: /^(\d{2})\/(\d{2})\/(\d{4})$/, parse: ([_, d, m, y]) => new Date(`${y}-${m}-${d}`) },
-    { pattern: /^(\d{4})-(\d{2})-(\d{2})$/, parse: ([_, y, m, d]) => new Date(`${y}-${m}-${d}`) },
-    { pattern: /^(\d{2})\/(\d{4})$/, parse: ([_, m, y]) => new Date(`${y}-${m}-01`) }
-  ];
-  for (const { pattern, parse } of formats) {
-    const match = dateStr.match(pattern);
-    if (match) {
-      const date = parse(match);
-      if (!isNaN(date)) return date;
+// Thêm utility function thống nhất cho xử lý ngày
+const dateUtils = {
+  // Parse từ chuỗi dd/mm/yyyy hoặc yyyy-mm-dd thành Date
+  parseDate: function(dateStr) {
+    if (!dateStr) return null;
+    
+    if (typeof dateStr === 'object' && dateStr.value) {
+      dateStr = dateStr.value;
     }
+    
+    if (typeof dateStr !== 'string') return null;
+    
+    let day, month, year;
+    
+    if (dateStr.includes('/')) { // dd/mm/yyyy
+      [day, month, year] = dateStr.split('/').map(Number);
+      return new Date(year, month - 1, day);
+    } else if (dateStr.includes('-')) { // yyyy-mm-dd hoặc dd-mm-yyyy
+      const parts = dateStr.split('-').map(Number);
+      if (parts[0] > 1000) { // yyyy-mm-dd
+        [year, month, day] = parts;
+      } else { // dd-mm-yyyy
+        [day, month, year] = parts;
+      }
+      return new Date(year, month - 1, day);
+    }
+    
+    return null;
+  },
+  
+  // Format từ Date sang dd/mm/yyyy
+  formatToDDMMYYYY: function(date) {
+    if (!(date instanceof Date)) return '';
+    return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+  },
+  
+  // Format từ Date sang yyyy-mm-dd
+  formatToYYYYMMDD: function(date) {
+    if (!(date instanceof Date)) return '';
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   }
-  console.error(`Cannot parse date: ${dateStr}`);
-  return new Date(0);
-}
-
-function formatDateToDDMMYYYY(date) {
-  if (!date || isNaN(date)) return '';
-  const d = String(date.getDate()).padStart(2, '0');
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const y = date.getFullYear();
-  return `${d}/${m}/${y}`;
-}
+};
 
 function calculateDaysSinceLastOrder(lastOrderDate) {
-  const lastOrder = parseDate(lastOrderDate);
+  const lastOrder = dateUtils.parseDate(lastOrderDate);
   if (isNaN(lastOrder) || lastOrder.getTime() === 0) {
     return Infinity; // Nếu không có ngày hợp lệ, coi như "rất lâu"
   }
@@ -94,23 +145,15 @@ function formatMonthYear(date) {
   return date.toLocaleString('en-US', { month: '2-digit', year: 'numeric' }).replace(/(\d+)\/(\d+)/, '$1/$2');
 }
 
-function formatDateToYYYYMMDD(date) {
-  if (!date || isNaN(date)) return '';
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 function getDateRangeForChurn(churnMonth) {
-  const churnDate = parseDate(churnMonth);
+  const churnDate = dateUtils.parseDate(churnMonth);
   const minDate = new Date(churnDate.getFullYear(), churnDate.getMonth(), 1);
   const maxDate = new Date(CURRENT_DATE);
   return { minDate, maxDate };
 }
 
 function getDateRangeForActive(activeMonth) {
-  const activeDate = parseDate(activeMonth);
+  const activeDate = dateUtils.parseDate(activeMonth);
   const minDate = new Date(activeDate.getFullYear(), activeDate.getMonth(), 1);
   const maxDate = new Date(activeDate.getFullYear(), activeDate.getMonth() + 1, 0); // Ngày cuối của tháng
   maxDate.setHours(23, 59, 59, 999); // Đảm bảo lấy hết ngày cuối
@@ -138,7 +181,7 @@ function updateLastUpdated() {
       displayDate = now;
     }
 
-    const formattedDate = formatDateToDDMMYYYY(displayDate);
+    const formattedDate = dateUtils.formatToDDMMYYYY(displayDate);
     lastUpdated.textContent = `11:00 am - ${formattedDate}`;
   }
 }
@@ -147,6 +190,64 @@ let currentPage = 1;
 let totalPages = 1;
 let filteredStores = [];
 let userEmail = '';
+
+// Thêm hàm standardizeDateObjects ở phạm vi toàn cục
+function standardizeDateObjects(data) {
+  // Xử lý lastOrderDate trong danh sách stores
+  if (data && data.stores) {
+    data.stores.forEach(store => {
+      if (typeof store.lastOrderDate === 'object' && store.lastOrderDate && store.lastOrderDate.value) {
+        const dateParts = store.lastOrderDate.value.split('-');
+        if (dateParts.length === 3) {
+          store.lastOrderDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+        } else {
+          store.lastOrderDate = String(store.lastOrderDate.value);
+        }
+      }
+    });
+  }
+  
+  // Xử lý progressByStore nếu có
+  if (data && data.progressByStore) {
+    Object.keys(data.progressByStore).forEach(storeId => {
+      const items = data.progressByStore[storeId];
+      if (Array.isArray(items)) {
+        items.forEach(item => {
+          // Xử lý churnMonth nếu là object
+          if (typeof item.churnMonth === 'object' && item.churnMonth && item.churnMonth.value) {
+            const dateParts = item.churnMonth.value.split('-');
+            if (dateParts.length === 3) {
+              item.churnMonth = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+            }
+          }
+          
+          // Xử lý ngày trong actions
+          if (item.actions && Array.isArray(item.actions)) {
+            item.actions.forEach(action => {
+              // Xử lý contactDate
+              if (typeof action.contactDate === 'object' && action.contactDate && action.contactDate.value) {
+                const dateParts = action.contactDate.value.split('-');
+                if (dateParts.length === 3) {
+                  action.contactDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+                }
+              }
+              
+              // Xử lý churnMonth trong action
+              if (typeof action.churnMonth === 'object' && action.churnMonth && action.churnMonth.value) {
+                const dateParts = action.churnMonth.value.split('-');
+                if (dateParts.length === 3) {
+      action.churnMonth = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+                }
+              }
+            });
+          }
+        });
+      }
+    });
+  }
+  
+  return data;
+}
 
 const observer = new IntersectionObserver((entries) => {
   if (entries[0].isIntersecting && currentPage < totalPages && typeof progressByStore !== 'undefined') {
@@ -194,6 +295,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const resetButton = document.getElementById('reset-button');
   resetButton.addEventListener('click', async () => {
     await performFullDataRefresh();
+    
+    // Also refresh motivation messages
+    await fetchAndDisplayMotivationMessages();
+    
     showNotification('All data has been refreshed successfully!', 'success');
   });
   
@@ -322,24 +427,30 @@ async function fetchAndDisplayData(userEmail, cacheKey) {
       return;
     }
 
+    // Sử dụng hàm đã được định nghĩa ở phạm vi toàn cục
+    const standardizedData = standardizeDateObjects(data);
+
     const now = new Date().getTime();
     localStorage.setItem(cacheKey, JSON.stringify({
-      data,
+      data: standardizedData,
       timestamp: now
     }));
 
-    displayData(data, userEmail);
+    displayData(standardizedData, userEmail);
   } catch (error) {
     console.error('Error fetching data:', error);
-    showNotification(error.message.includes('No internet') ? 'Please check your network connection.' : 'Error loading data. Please try again.', 'error');
-    window.location.href = 'index.html';
+    hideLoading();
+    showNotification(error.message.includes('No internet') ? 'Please check your network connection.' : error.message || 'Failed to load data', 'error');
   } finally {
     hideLoading();
   }
 }
 
 async function displayData(data, userEmailParam) {
-  userEmail = userEmailParam; // Cập nhật userEmail toàn cục
+  // Chuẩn hóa dữ liệu ngày tháng
+  data = standardizeDateObjects(data);
+  
+  userEmail = userEmailParam; // Tiếp tục với code hiện tại
   if (!data || !data.picInfo || !data.stores || !Array.isArray(data.stores)) {
     console.error('Invalid data:', data);
     showNotification('Invalid data. Please log in again.', 'error');
@@ -430,27 +541,7 @@ async function displayData(data, userEmailParam) {
     // Ưu tiên các store Active và chưa mua trên 20 ngày
     if (isCriticalA && !isCriticalB) return -1;
     if (!isCriticalA && isCriticalB) return 1;
-
-    // Nếu cả hai đều là "critical", sắp xếp theo số ngày chưa mua (giảm dần)
-    if (isCriticalA && isCriticalB) {
-      // Xử lý trường hợp Infinity
-      if (noDaysNoBuyA === Infinity && noDaysNoBuyB === Infinity) return 0;
-      if (noDaysNoBuyA === Infinity) return -1; // Store A chưa mua lâu hơn
-      if (noDaysNoBuyB === Infinity) return 1;  // Store B chưa mua lâu hơn
-      return noDaysNoBuyB - noDaysNoBuyA; // So sánh bình thường
-    }
-
-    // Còn lại, sắp xếp theo ngày đặt hàng cuối (mới nhất lên đầu)
-    const dateA = a.lastOrderDate ? parseDate(a.lastOrderDate) : new Date(0);
-    const dateB = b.lastOrderDate ? parseDate(b.lastOrderDate) : new Date(0);
-    return dateB - dateA || (a.storeId.localeCompare(b.storeId));
-  });
-
-  // Log filteredStores sau khi sắp xếp để kiểm tra
-  filteredStores.forEach((store, index) => {
-    const noDaysNoBuy = calculateDaysSinceLastOrder(store.lastOrderDate);
-    const isCritical = store.statusChurnThisMonth === 'Active' && noDaysNoBuy > 20;
-    // console.log(`Initial Sorted Store [${index}]: ${store.storeId}, Status: ${store.statusChurnThisMonth}, Last Order: ${store.lastOrderDate}, No Days No Buy: ${noDaysNoBuy}, Is Critical: ${isCritical}`);
+    return noDaysNoBuyB - noDaysNoBuyA; // So sánh bình thường
   });
 
   totalPages = Math.ceil(filteredStores.length / ITEMS_PER_PAGE);
@@ -490,9 +581,21 @@ async function displayData(data, userEmailParam) {
 }
 
 function applyFilters(stores, progressByStore, userEmail, picInfo, dropdownChurnActions, dropdownActiveActions, dropdownWhyReasons) {
+  // Chuyển đổi lastOrderDate từ [object Object] sang chuỗi trước khi lọc
+  stores.forEach(store => {
+    if (typeof store.lastOrderDate === 'object' && store.lastOrderDate && store.lastOrderDate.value) {
+      // Chuyển đổi từ yyyy-mm-dd sang dd/mm/yyyy
+      const dateParts = store.lastOrderDate.value.split('-');
+      if (dateParts.length === 3) {
+        store.lastOrderDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+      } else {
+        store.lastOrderDate = store.lastOrderDate.value;
+      }
+    }
+  });
+  
   // Log để kiểm tra số lượng store Active trong toàn bộ danh sách
   const activeStoresCount = stores.filter(store => store.statusChurnThisMonth === 'Active').length;
-  // console.log(`Total stores: ${stores.length}, Active stores: ${activeStoresCount}`);
 
   const searchStoreId = document.getElementById('search-store-id').value.trim().toLowerCase();
   const searchStoreName = document.getElementById('search-store-name').value.trim().toLowerCase();
@@ -535,7 +638,7 @@ function applyFilters(stores, progressByStore, userEmail, picInfo, dropdownChurn
 
   const selectedWeek = document.getElementById('week-filter').value;
   if (selectedWeek) {
-    const weekStart = parseDate(selectedWeek);
+    const weekStart = dateUtils.parseDate(selectedWeek);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekEnd.getDate() + 6);
     weekEnd.setHours(23, 59, 59, 999);
@@ -544,7 +647,7 @@ function applyFilters(stores, progressByStore, userEmail, picInfo, dropdownChurn
       const storeProgress = progressByStore[store.storeId] || [];
       return storeProgress.some(progress =>
         progress.actions && progress.actions.some(action => {
-          const actionDate = parseDate(action.contactDate);
+          const actionDate = dateUtils.parseDate(action.contactDate);
           return actionDate >= weekStart && actionDate <= weekEnd;
         })
       );
@@ -553,7 +656,6 @@ function applyFilters(stores, progressByStore, userEmail, picInfo, dropdownChurn
 
   // Log sau khi lọc
   const activeStoresAfterFilter = filteredStores.filter(store => store.statusChurnThisMonth === 'Active').length;
-  // console.log(`Filtered stores: ${filteredStores.length}, Active stores after filter: ${activeStoresAfterFilter}`);
 
   // Sắp xếp toàn bộ filteredStores trước khi phân trang
   filteredStores.sort((a, b) => {
@@ -565,27 +667,7 @@ function applyFilters(stores, progressByStore, userEmail, picInfo, dropdownChurn
     // Ưu tiên các store Active và chưa mua trên 20 ngày
     if (isCriticalA && !isCriticalB) return -1;
     if (!isCriticalA && isCriticalB) return 1;
-
-    // Nếu cả hai đều là "critical", sắp xếp theo số ngày chưa mua (giảm dần)
-    if (isCriticalA && isCriticalB) {
-      // Xử lý trường hợp Infinity
-      if (noDaysNoBuyA === Infinity && noDaysNoBuyB === Infinity) return 0;
-      if (noDaysNoBuyA === Infinity) return -1; // Store A chưa mua lâu hơn
-      if (noDaysNoBuyB === Infinity) return 1;  // Store B chưa mua lâu hơn
-      return noDaysNoBuyB - noDaysNoBuyA; // So sánh bình thường
-    }
-
-    // Còn lại, sắp xếp theo ngày đặt hàng cuối (mới nhất lên đầu)
-    const dateA = a.lastOrderDate ? parseDate(a.lastOrderDate) : new Date(0);
-    const dateB = b.lastOrderDate ? parseDate(b.lastOrderDate) : new Date(0);
-    return dateB - dateA || (a.storeId.localeCompare(b.storeId));
-  });
-
-  // Log filteredStores sau khi sắp xếp để kiểm tra
-  filteredStores.forEach((store, index) => {
-    const noDaysNoBuy = calculateDaysSinceLastOrder(store.lastOrderDate);
-    const isCritical = store.statusChurnThisMonth === 'Active' && noDaysNoBuy > 20;
-    // console.log(`Sorted Store [${index}]: ${store.storeId}, Status: ${store.statusChurnThisMonth}, Last Order: ${store.lastOrderDate}, No Days No Buy: ${noDaysNoBuy}, Is Critical: ${isCritical}`);
+    return noDaysNoBuyB - noDaysNoBuyA; // So sánh bình thường
   });
 
   currentPage = 1;
@@ -649,7 +731,7 @@ function getStartOfWeek(date) {
 }
 
 function getStartAndEndOfWeek(weekValue) {
-  const weekStart = parseDate(weekValue);
+  const weekStart = dateUtils.parseDate(weekValue);
   const startOfWeek = getStartOfWeek(weekStart);
   const endOfWeek = new Date(startOfWeek);
   endOfWeek.setDate(startOfWeek.getDate() + 6); // End of the week (7 days later)
@@ -661,7 +743,7 @@ function getWeekOptions(progressByStore) {
   Object.values(progressByStore).forEach(items => {
     items.forEach(item => {
       (item.actions || []).forEach(action => {
-        const d = parseDate(action.contactDate);
+        const d = dateUtils.parseDate(action.contactDate);
         if (!isNaN(d)) allDates.push(getStartOfWeek(d).getTime());
       });
     });
@@ -670,14 +752,29 @@ function getWeekOptions(progressByStore) {
   return uniqueWeeks.map(ts => {
     const d = new Date(ts);
     return {
-      value: formatDateToYYYYMMDD(d),
-      label: `${formatDateToDDMMYYYY(d)}`
+      value: dateUtils.formatToYYYYMMDD(d),
+      label: `${dateUtils.formatToDDMMYYYY(d)}`
     };
   });
 }
 
 function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnActions, dropdownActiveActions, dropdownWhyReasons) {
-  // console.log(`Current Page: ${currentPage}, Total Pages: ${totalPages}`); // Thêm log để debug
+  // Kiểm tra và xử lý đối tượng ngày tháng trước khi hiển thị
+  stores.forEach(store => {
+    if (typeof store.lastOrderDate === 'object' && store.lastOrderDate) {
+      if (store.lastOrderDate.value) {
+        const dateParts = store.lastOrderDate.value.split('-');
+        if (dateParts.length === 3) {
+          store.lastOrderDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+        } else {
+          store.lastOrderDate = String(store.lastOrderDate.value);
+        }
+      } else {
+        store.lastOrderDate = 'N/A'; // Fallback nếu không có value
+      }
+    }
+  });
+  
 
   const tbody = document.getElementById('stores-body');
   const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -690,7 +787,6 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
   paginatedStores.forEach(store => {
     const noDaysNoBuy = calculateDaysSinceLastOrder(store.lastOrderDate);
     const isCritical = store.statusChurnThisMonth === 'Active' && noDaysNoBuy > 20;
-    // console.log(`Store: ${store.storeId}, Status: ${store.statusChurnThisMonth}, Last Order: ${store.lastOrderDate}, No Days No Buy: ${noDaysNoBuy}, Is Critical: ${isCritical}`);
   });
 
   requestAnimationFrame(() => {
@@ -800,7 +896,7 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
       actionBtn.addEventListener('click', async () => {
         const storeId = actionBtn.getAttribute('data-store-id');
         const modal = document.getElementById('action-modal');
-        modal.classList.add('active');
+        showActionModal();
 
         document.getElementById('modal-store-id').value = storeId || 'N/A';
         const store = stores.find(s => s.storeId === storeId);
@@ -825,50 +921,55 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ storeId })
           });
-          if (!activeHistoryResponse.ok) throw new Error(`HTTP error! Status: ${activeHistoryResponse.status}`);
-          activeHistory = await activeHistoryResponse.json();
-          
-          // Sort active history by date to find the most recent one
+          const activeHistory = await activeHistoryResponse.json();
+
+          // Sort active history by date (most recent first)
           activeHistory.sort((a, b) => {
-            const dateA = parseDate(a.activeMonth);
-            const dateB = parseDate(b.activeMonth);
-            return dateB - dateA; // Sort descending (newest first)
+            const dateA = dateUtils.parseDate(a.activeMonth);
+            const dateB = dateUtils.parseDate(b.activeMonth);
+            return dateB - dateA;
           });
-          
-          // Get the most recent Active Month
-          const latestActiveMonth = activeHistory.length > 0 ? activeHistory[0].activeMonth : null;
-          
-          // Add all active months to the dropdown
-          activeHistory.forEach(history => {
+
+          // Get current month in the same format as activeMonth (MM/YYYY)
+          const currentMonth = formatMonthYear(CURRENT_DATE);
+
+          // Check if current month exists in active history
+          const hasCurrentMonthInHistory = activeHistory.some(item => 
+            item.activeMonth === currentMonth
+          );
+
+          // Determine which month to select - prioritize current month if store is Active
+          let selectedMonth;
+          if (store.statusChurnThisMonth === 'Active') {
+            // For active stores, prefer current month
+            selectedMonth = currentMonth;
+          } else {
+            // For non-active stores, use latest active month from history
+            selectedMonth = activeHistory.length > 0 ? activeHistory[0].activeMonth : null;
+          }
+
+          // Populate dropdown with all history items
+          activeHistory.forEach(item => {
             const option = document.createElement('option');
-            option.value = history.activeMonth;
-            option.textContent = history.activeMonth + (history.activeMonth === latestActiveMonth ? ' (Latest)' : '');
+            option.value = item.activeMonth;
+            option.textContent = item.activeMonth;
             activeMonthSelect.appendChild(option);
           });
 
-          // Set the default value to most recent active month
-          if (latestActiveMonth) {
-            activeMonthSelect.value = latestActiveMonth;
-          }
-          // For currently active stores with recent orders
-          else if (store && store.statusChurnThisMonth === 'Active' && calculateDaysSinceLastOrder(store.lastOrderDate) <= 30) {
-            const currentMonth = formatMonthYear(CURRENT_DATE);
+          // Add current month if it's not in the history and store is Active
+          if (store.statusChurnThisMonth === 'Active' && !hasCurrentMonthInHistory) {
             const option = document.createElement('option');
             option.value = currentMonth;
-            option.textContent = currentMonth + ' (Current Active)';
+            option.textContent = currentMonth + ' (Current)';
             activeMonthSelect.appendChild(option);
-            activeMonthSelect.value = currentMonth;
-          } 
-          // If no active history but the store is active (fallback)
-          else if (activeHistory.length === 0) {
-            const option = document.createElement('option');
-            option.value = 'N/A';
-            option.textContent = 'N/A (Current Active)';
-            activeMonthSelect.appendChild(option);
-            activeMonthSelect.value = 'N/A';
           }
-          
-          // Disable the dropdown so user can't change it
+
+          // Select the appropriate month
+          if (selectedMonth) {
+            activeMonthSelect.value = selectedMonth;
+          }
+
+          // Keep the dropdown disabled as before
           activeMonthSelect.disabled = true;
         } catch (error) {
           console.error('Error fetching Active History:', error);
@@ -901,8 +1002,8 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
         sixDaysAgo.setHours(0, 0, 0, 0);
 
         // Set the HTML input constraints - this controls what the calendar shows
-        contactDateInput.setAttribute('min', formatDateToYYYYMMDD(sixDaysAgo));
-        contactDateInput.setAttribute('max', formatDateToYYYYMMDD(today));
+        contactDateInput.setAttribute('min', dateUtils.formatToYYYYMMDD(sixDaysAgo));
+        contactDateInput.setAttribute('max', dateUtils.formatToYYYYMMDD(today));
 
         // Kiểm tra xem có lịch sử churn hay không để bật/tắt nút Churn
         if (latestChurn) {
@@ -974,7 +1075,7 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
           const value = contactDateInput.value;
           if (value) {
             const date = new Date(value);
-            contactDateInput.value = formatDateToYYYYMMDD(date);
+            contactDateInput.value = dateUtils.formatToYYYYMMDD(date);
             // Remove the code that auto-selects Active Month based on contact date
             // since we're now using the most recent Active Month from the database
           }
@@ -1054,7 +1155,7 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
     const modal = document.getElementById('action-modal');
     const closeBtn = modal.querySelector('.close');
     const resetModal = () => {
-      modal.classList.remove('active');
+      hideActionModal();
       document.getElementById('modal-note').value = '';
       document.getElementById('modal-link-hubspot').value = ''; // Thêm dòng này
       document.getElementById('modal-contact-date').value = '';
@@ -1090,7 +1191,7 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
       const activeMonth = !isChurnActive ? document.getElementById('modal-active-month').value : '';
 
       if (!contactDate || !typeOfContact || !action || (!isChurnActive && !activeMonth)) {
-        showNotification('Please fill in all required fields: Contact Date, Type of Contact, Action, and Active Month (if applicable)!', 'error');
+        showNotification('Please fill in all required fields: Contact Date, Type of Contact, Action, and Active Month (if applicable)!', 'warning');
         return;
       }
 
@@ -1106,23 +1207,9 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
       sixDaysAgo.setHours(0, 0, 0, 0);
 
       if (selectedContactDate < sixDaysAgo || selectedContactDate > today) {
-        const minFormatted = formatDateToDDMMYYYY(sixDaysAgo);
-        const maxFormatted = formatDateToDDMMYYYY(today);
+        const minFormatted = dateUtils.formatToDDMMYYYY(sixDaysAgo);
+        const maxFormatted = dateUtils.formatToDDMMYYYY(today);
         showNotification(`Contact Date must be between ${minFormatted} and ${maxFormatted} (last 7 days)!`, 'error');
-        return;
-      }
-
-      const progressItems = progressByStore[storeId] || [];
-      const isDuplicate = progressItems.some(item => {
-        return item.actions.some(actionItem => 
-          actionItem.contactDate === formatDateToDDMMYYYY(selectedContactDate) &&
-          actionItem.typeOfContact === typeOfContact &&
-          actionItem.action === action &&
-          (isChurnActive ? item.churnMonth === churnMonthLastOrderDate : item.activeMonth === activeMonth)
-        );
-      });
-      if (isDuplicate) {
-        showNotification('This action already exists for the selected date and type!', 'error');
         return;
       }
 
@@ -1131,7 +1218,7 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
         storeId,
         storeName,
         action,
-        contactDate: formatDateToDDMMYYYY(selectedContactDate),
+        contactDate: dateUtils.formatToDDMMYYYY(selectedContactDate),
         PIC: pic,
         subteam,
         typeOfContact,
@@ -1156,14 +1243,9 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
 
         const result = await response.json();
         if (result.success) {
-          resetModal(); // Close the modal immediately on success
-          
-          // Instead of just updating a single store's progress,
-          // perform a full data refresh to ensure everything is up to date
-          await performFullDataRefresh();
-          
-          // Hiển thị thông báo thành công sau khi refresh data xong
-          showNotification('Action submitted successfully!', 'success');
+          hideLoading(); // Thêm dòng này
+          resetModal();
+          showSuccessModal();
         } else {
           hideLoading();
           setTimeout(() => {
@@ -1172,7 +1254,7 @@ function updateTable(stores, progressByStore, userEmail, picInfo, dropdownChurnA
         }
       } catch (error) {
         console.error('Error submitting action:', error);
-        hideLoading();
+        hideLoading(); // Đảm bảo ẩn loading trong mọi trường hợp
         setTimeout(() => {
           if (error.status === 429) {
             showNotification('Too many requests. Please wait 1-2 minutes before trying again.', 'warning');
@@ -1219,4 +1301,244 @@ function updateWeekFilter(progressByStore) {
   // Giữ lại tuần đã chọn nếu còn tồn tại
   const weekExists = weekOptions.some(opt => opt.value === selectedWeek);
   weekFilter.value = weekExists ? selectedWeek : '';
+}
+
+// Cập nhật hàm hiển thị success modal
+function showSuccessModal() {
+  toggleModal('success-modal', true);
+}
+
+// Cập nhật hàm hiển thị export confirmation modal
+function showExportConfirmationModal() {
+  toggleModal('export-confirmation-modal', true);
+}
+
+function toggleModal(modalId, show = true) {
+  const modal = document.getElementById(modalId);
+  if (!modal) return;
+  
+  if (show) {
+    modal.style.display = 'flex';
+    setTimeout(() => modal.classList.add('active'), 10);
+  } else {
+    modal.classList.remove('active');
+    setTimeout(() => modal.style.display = 'none', 300);
+  }
+}
+
+// Cập nhật hàm ẩn export confirmation modal
+function hideExportConfirmationModal() {
+  toggleModal('export-confirmation-modal', false);
+}
+
+// Hàm lấy dữ liệu theo bộ lọc hiện tại
+async function exportFilteredData() {
+  showLoading();
+  
+  try {
+    // Lấy danh sách store IDs đã được lọc
+    const storeIds = filteredStores.map(store => store.storeId);
+    
+    // Lấy giá trị từ bộ lọc week
+    const weekFilter = document.getElementById('week-filter').value;
+    let weekValue = weekFilter;
+    
+    // Nếu chọn phương thức mới, chuyển từ định dạng YYYY-MM-DD_to_YYYY-MM-DD sang một ngày bắt đầu
+    if (weekFilter && weekFilter.includes('_to_')) {
+      const [startDate] = weekFilter.split('_to_');
+      weekValue = startDate; // Chỉ lấy ngày bắt đầu
+    }
+    
+    // Lấy dữ liệu progress đã được lọc từ server
+    const response = await fetch(`${PROXY_URL}/export-data`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        email: userEmail,
+        storeIds: storeIds,
+        filters: {
+          pic: document.getElementById('pic-filter').value,
+          status: document.getElementById('status-filter').value,
+          week: weekValue
+        }
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    if (!data || !data.success || !data.exportData) {
+      throw new Error('Invalid data received from server');
+    }
+    
+    // Xử lý dữ liệu - gộp cột Churn_Month và Month
+    const processedData = data.exportData.map(item => {
+      const newItem = {...item};
+      
+      // Nếu có Churn_Month, đặt giá trị cho Month và xóa Churn_Month
+      if (newItem.Churn_Month !== undefined) {
+        newItem.Month = newItem.Churn_Month;
+        delete newItem.Churn_Month;
+      }
+      
+      return newItem;
+    });
+    
+    // Tạo và tải file Excel với dữ liệu đã xử lý
+    generateAndDownloadExcel(processedData);
+    
+  } catch (error) {
+    console.error('Error exporting data:', error);
+    showNotification('Failed to export data: ' + error.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+// Hàm tạo và tải file Excel
+function generateAndDownloadExcel(data) {
+  try {
+    // Sử dụng thư viện SheetJS để tạo file Excel
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Export Data");
+    
+    // Tạo tên file theo định dạng pic_subteam_datetime
+    const now = new Date();
+    const dateTimeStr = now.toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
+    const picCode = userEmail.split('@')[0];
+    const subteam = picInfo.subteam ? picInfo.subteam.replace(/\s+/g, '_') : 'all';
+    const fileName = `${picCode}_${subteam}_${dateTimeStr}.xlsx`;
+    
+    // Tạo và tải file
+    XLSX.writeFile(workbook, fileName);
+    
+    // Hiển thị thông báo thành công
+    showNotification('Data exported successfully!', 'success');
+  } catch (error) {
+    console.error('Error generating Excel:', error);
+    showNotification('Failed to generate Excel file: ' + error.message, 'error');
+  }
+}
+
+// Thiết lập các sự kiện khi trang đã tải
+document.addEventListener('DOMContentLoaded', () => {
+  // Thêm vào DOMContentLoaded event để setup các event listeners
+  const exportButton = document.getElementById('export-button');
+  if (exportButton) {
+    exportButton.addEventListener('click', () => {
+      showExportConfirmationModal();
+    });
+  }
+  
+  const exportYesBtn = document.getElementById('export-yes-btn');
+  if (exportYesBtn) {
+    exportYesBtn.addEventListener('click', () => {
+      hideExportConfirmationModal();
+      exportFilteredData();
+    });
+  }
+  
+  const exportNoBtn = document.getElementById('export-no-btn');
+  if (exportNoBtn) {
+    exportNoBtn.addEventListener('click', () => {
+      hideExportConfirmationModal();
+    });
+  }
+  
+  // Thêm đoạn mã để load thư viện SheetJS (xlsx)
+  if (typeof XLSX === 'undefined') {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    script.async = true;
+    document.head.appendChild(script);
+  }
+
+  // Thêm vào phần document.addEventListener('DOMContentLoaded', () => {...})
+  const successOkBtn = document.getElementById('success-ok-btn');
+  if (successOkBtn) {
+    successOkBtn.addEventListener('click', () => {
+      toggleModal('success-modal', false);
+    });
+  }
+});
+
+// Thêm hiệu ứng cho hàm hiển thị action modal
+function showActionModal() {
+  toggleModal('action-modal', true);
+}
+
+// Thêm hiệu ứng cho hàm ẩn action modal
+function hideActionModal() {
+  toggleModal('action-modal', false);
+}
+
+// Replace the existing DOMContentLoaded event at the end of the file
+
+document.addEventListener('DOMContentLoaded', async function() {
+  // Fetch motivation messages on initial page load
+  await fetchAndDisplayMotivationMessages();
+  
+  // Other DOMContentLoaded code...
+});
+
+// Extract the rotation logic to a separate function
+function setupChatBubbleRotation() {
+  const chatBubbles = document.querySelectorAll('.chat-bubbles .chat-bubble');
+  let currentBubbleIndex = 0;
+  
+  function rotateChatBubbles() {
+    // Hide all bubbles
+    chatBubbles.forEach(bubble => bubble.classList.remove('active'));
+    
+    // Show current bubble
+    chatBubbles[currentBubbleIndex].classList.add('active');
+    
+    // Increment index for next rotation
+    currentBubbleIndex = (currentBubbleIndex + 1) % chatBubbles.length;
+    
+    // Schedule next rotation
+    setTimeout(rotateChatBubbles, 3500);
+  }
+  
+  // Start the rotation
+  if (chatBubbles.length > 0) {
+    rotateChatBubbles();
+  }
+}
+
+// Add this function before setupChatBubbleRotation()
+
+async function fetchAndDisplayMotivationMessages() {
+  try {
+    const response = await fetch(`${PROXY_URL}/motivation-messages?force=true`);
+    if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+    
+    const messages = await response.json();
+    if (messages && messages.length > 0) {
+      // Get chat-bubbles container
+      const chatBubblesContainer = document.querySelector('.chat-bubbles');
+      
+      // Clear existing chat bubbles
+      chatBubblesContainer.innerHTML = '';
+      
+      // Create new chat bubbles from fetched messages
+      messages.forEach((message, index) => {
+        const bubble = document.createElement('div');
+        bubble.className = 'chat-bubble';
+        if (index === 0) bubble.classList.add('active'); // Make first bubble active
+        bubble.textContent = message;
+        chatBubblesContainer.appendChild(bubble);
+      });
+      
+      // Setup rotation for new bubbles
+      setupChatBubbleRotation();
+    }
+  } catch (error) {
+    console.error('Failed to load motivation messages:', error);
+    // If fetch fails, still setup rotation for existing hardcoded bubbles
+    setupChatBubbleRotation();
+  }
 }
