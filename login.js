@@ -1,4 +1,4 @@
-const PROXY_URL = 'https://reawake-server.onrender.com';
+const PROXY_URL = 'https://reawake-server-wjmi.onrender.com';
 
 function showLoading() {
   document.getElementById('loading').style.display = 'flex';
