@@ -4,7 +4,7 @@ let dropdownActiveActions = [];
 let dropdownWhyReasons = {};
 let picInfo = {};
 
-const PROXY_URL = 'https://reawake-server.onrender.com';
+const PROXY_URL = 'https://reawake-server-wjmi.onrender.com';
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 const CURRENT_DATE = new Date();
 const ITEMS_PER_PAGE = 20;
